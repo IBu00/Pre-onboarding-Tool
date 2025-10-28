@@ -54,6 +54,35 @@ class TestService {
     try {
       const response = await apiService.testFileDownload();
       
+      // Handle blob response (for large files sent as binary)
+      if (response.blob) {
+        const url = window.URL.createObjectURL(response.blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'VDR-Test-Files.zip';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        
+        const fileSizeMB = (response.blob.size / (1024 * 1024)).toFixed(2);
+        
+        return this.createResult(
+          TestType.FILE_DOWNLOAD,
+          'File Download Test',
+          'PASS',
+          'Large ZIP file downloaded successfully',
+          `Successfully downloaded VDR-Test-Files.zip (${fileSizeMB} MB) containing all test files. Your browser and network allow large file downloads without restrictions. Extract the ZIP file and use these files for the Upload Test.`,
+          undefined,
+          {
+            downloadedFile: 'VDR-Test-Files.zip',
+            fileSize: response.blob.size,
+            downloadMethod: 'binary'
+          }
+        );
+      }
+      
+      // Handle JSON response with base64 (for smaller files)
       if (response.success && response.metadata?.zipFile) {
         // Download the single ZIP file
         const zipFile = response.metadata.zipFile;
@@ -74,12 +103,13 @@ class TestService {
           'File Download Test',
           'PASS',
           'ZIP file downloaded successfully',
-          `Successfully downloaded ${zipFile.name} (${fileSizeMB} MB) containing ${response.metadata.filesCount} test files. Your browser and network allow file downloads without restrictions. Extract the ZIP file and use these files for the Upload Test.`,
+          `Successfully downloaded ${zipFile.name} (${fileSizeMB} MB) containing test files. Your browser and network allow file downloads without restrictions. Extract the ZIP file and use these files for the Upload Test.`,
           undefined,
           {
             ...response.metadata,
             downloadedFile: zipFile.name,
-            fileSize: zipFile.size
+            fileSize: zipFile.size,
+            downloadMethod: 'base64'
           }
         );
       }

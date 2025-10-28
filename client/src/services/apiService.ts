@@ -55,8 +55,38 @@ class ApiService {
 
   // File download test - Netlify Function: file-download
   async testFileDownload() {
-    const response = await this.api.get('/file-download');
-    return response.data;
+    try {
+      // First, try to get as JSON (for smaller ZIPs)
+      const response = await this.api.get('/file-download', {
+        responseType: 'json'
+      });
+      
+      // Check if we got JSON response with base64
+      if (response.data && response.data.metadata?.zipFile) {
+        return response.data;
+      }
+      
+      // If response is binary (Content-Type: application/zip), handle it differently
+      return response.data;
+    } catch (error: any) {
+      // If JSON parsing fails, might be binary response
+      if (error.response) {
+        const contentType = error.response.headers['content-type'];
+        if (contentType && contentType.includes('application/zip')) {
+          // Re-fetch as blob for direct download
+          const blobResponse = await this.api.get('/file-download', {
+            responseType: 'blob'
+          });
+          return {
+            success: true,
+            message: 'ZIP file ready',
+            details: 'Large ZIP file ready for download',
+            blob: blobResponse.data
+          };
+        }
+      }
+      throw error;
+    }
   }
 
   // Download all test files at once

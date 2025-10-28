@@ -68,27 +68,47 @@ exports.handler = async (event, context) => {
         const zipBuffer = Buffer.concat(chunks);
         const base64Zip = zipBuffer.toString('base64');
         
-        resolve({
-          statusCode: 200,
-          headers: {
-            ...headers,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            success: true,
-            message: 'ZIP file created successfully',
-            details: 'VDR Test Files ZIP ready for download. Extract the ZIP and use these files for the upload test.',
-            metadata: {
-              zipFile: {
-                name: 'VDR-Test-Files.zip',
-                content: base64Zip,
-                size: zipBuffer.length,
-                type: 'application/zip',
-                encoding: 'base64'
+        // Check if ZIP size exceeds Lambda's 6MB limit
+        const zipSizeMB = zipBuffer.length / 1024 / 1024;
+        console.log(`ZIP size: ${zipSizeMB.toFixed(2)}MB`);
+        
+        if (zipBuffer.length > 6 * 1024 * 1024) {
+          // If too large, send in chunks or direct binary response
+          resolve({
+            statusCode: 200,
+            headers: {
+              ...headers,
+              'Content-Type': 'application/zip',
+              'Content-Disposition': 'attachment; filename="VDR-Test-Files.zip"',
+              'Content-Length': zipBuffer.length.toString()
+            },
+            body: base64Zip,
+            isBase64Encoded: true
+          });
+        } else {
+          // If small enough, send as JSON
+          resolve({
+            statusCode: 200,
+            headers: {
+              ...headers,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              success: true,
+              message: 'ZIP file created successfully',
+              details: 'VDR Test Files ZIP ready for download. Extract the ZIP and use these files for the upload test.',
+              metadata: {
+                zipFile: {
+                  name: 'VDR-Test-Files.zip',
+                  content: base64Zip,
+                  size: zipBuffer.length,
+                  type: 'application/zip',
+                  encoding: 'base64'
+                }
               }
-            }
-          })
-        });
+            })
+          });
+        }
       });
 
       // Handle errors
