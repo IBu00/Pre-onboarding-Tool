@@ -16,17 +16,15 @@ const TestRunner: React.FC = () => {
   const [isComplete, setIsComplete] = useState(false);
   const [userEmail, setUserEmail] = useState('');
   const [showEmailInput, setShowEmailInput] = useState(false);
-  const [emailCode, setEmailCode] = useState('');
   const [tfaCode, setTfaCode] = useState('');
-  const [waitingForEmailVerification, setWaitingForEmailVerification] = useState(false);
   const [waitingFor2FAVerification, setWaitingFor2FAVerification] = useState(false);
+  const [showDownloadButton, setShowDownloadButton] = useState(false);
+  const [showUploadButton, setShowUploadButton] = useState(false);
   
   // Refs to store email send timestamp for timing measurement
-  const emailSentTimeRef = useRef<number>(0);
   const tfaSentTimeRef = useRef<number>(0);
   
   // Refs to resolve promises from button clicks
-  const emailVerificationResolveRef = useRef<((code: string) => void) | null>(null);
   const tfaVerificationResolveRef = useRef<((code: string) => void) | null>(null);
 
   const startTests = async () => {
@@ -55,13 +53,12 @@ const TestRunner: React.FC = () => {
 
     // Run tests sequentially
     await runTest1(initialResults); // Domain Access
-    await runTest2(initialResults); // Email Delivery
-    await runTest3(initialResults); // Email 2FA
-    await runTest4(initialResults); // File Download
-    await runTest5(initialResults); // File Upload
-    await runTest6(initialResults); // Intercom
-    await runTest7(initialResults); // Resolution
-    await runTest8(initialResults); // Speed Test
+    await runTest2(initialResults); // Email Delivery + 2FA Timing (combined)
+    await runTest3(initialResults); // File Download
+    await runTest4(initialResults); // File Upload
+    await runTest5(initialResults); // Intercom
+    await runTest6(initialResults); // Resolution
+    await runTest7(initialResults); // Speed Test
 
     setIsRunning(false);
     setIsComplete(true);
@@ -74,14 +71,6 @@ const TestRunner: React.FC = () => {
       newResults[index] = result;
       return newResults;
     });
-  };
-
-  const handleEmailVerification = () => {
-    if (emailCode.length === 6 && emailVerificationResolveRef.current) {
-      emailVerificationResolveRef.current(emailCode);
-      emailVerificationResolveRef.current = null;
-      setWaitingForEmailVerification(false);
-    }
   };
 
   const handleTfaVerification = () => {
@@ -102,55 +91,55 @@ const TestRunner: React.FC = () => {
 
   const runTest2 = async (results: TestResult[]) => {
     setCurrentTestIndex(1);
-    updateTestResult(1, { ...results[1], status: 'RUNNING', message: 'Sending test email...' });
+    updateTestResult(1, { ...results[1], status: 'RUNNING', message: 'Sending 2FA email...' });
     
     const startTime = Date.now();
     
     try {
-      // Send test email
-      const sendResult = await apiService.sendTestEmail(userEmail);
+      // Send 2FA email
+      const sendResult = await apiService.send2FACode(userEmail);
       
       if (!sendResult.success) {
-        throw new Error(sendResult.message || 'Failed to send email');
+        throw new Error(sendResult.message || 'Failed to send 2FA email');
       }
       
-      // Record when email was sent
-      emailSentTimeRef.current = Date.now();
-      setWaitingForEmailVerification(true);
-      setEmailCode('');
+      // Record when 2FA email was sent (for delivery time measurement)
+      tfaSentTimeRef.current = Date.now();
+      setWaitingFor2FAVerification(true);
+      setTfaCode('');
       
       updateTestResult(1, { 
         ...results[1], 
         status: 'RUNNING', 
-        message: 'Email sent. Please check your inbox and enter the code...' 
+        message: 'Email sent. Please check your inbox and enter the 6-digit code...' 
       });
       
-      // Wait for user to enter and verify the code
+      // Wait for user to enter and verify the 2FA code
       const code = await new Promise<string>((resolve, reject) => {
-        emailVerificationResolveRef.current = resolve;
+        tfaVerificationResolveRef.current = resolve;
         
         // Timeout after 5 minutes
         setTimeout(() => {
-          if (emailVerificationResolveRef.current) {
-            emailVerificationResolveRef.current = null;
-            setWaitingForEmailVerification(false);
+          if (tfaVerificationResolveRef.current) {
+            tfaVerificationResolveRef.current = null;
+            setWaitingFor2FAVerification(false);
             reject(new Error('Verification timeout'));
           }
         }, 300000); // 5 minutes
       });
       
-      // Calculate delivery time
-      const deliveryTime = (Date.now() - emailSentTimeRef.current) / 1000;
+      // Calculate delivery time (from send to code entry)
+      const deliveryTime = (Date.now() - tfaSentTimeRef.current) / 1000;
       const duration = (Date.now() - startTime) / 1000;
       
-      // Email was delivered successfully
+      // Email + 2FA verification successful
       updateTestResult(1, {
         id: '2',
-        type: TestType.EMAIL_DELIVERY,
-        testName: 'Email Delivery Test',
+        type: TestType.EMAIL_2FA,
+        testName: 'Email Delivery & 2FA Test',
         status: 'PASS',
-        message: 'Email delivered successfully',
-        details: `Test email was successfully delivered to ${userEmail}. Delivery time: ${deliveryTime.toFixed(2)} seconds. Email server is functioning correctly and emails are being delivered without issues.`,
+        message: 'Email delivered and 2FA verified successfully',
+        details: `Test email was successfully delivered to ${userEmail}. Delivery time: ${deliveryTime.toFixed(2)} seconds. 2FA code verified successfully. Email server is functioning correctly.`,
         timestamp: new Date(),
         recommendations: [],
         duration,
@@ -163,15 +152,15 @@ const TestRunner: React.FC = () => {
       
     } catch (error: any) {
       const duration = (Date.now() - startTime) / 1000;
-      setWaitingForEmailVerification(false);
+      setWaitingFor2FAVerification(false);
       
       updateTestResult(1, {
         id: '2',
-        type: TestType.EMAIL_DELIVERY,
-        testName: 'Email Delivery Test',
+        type: TestType.EMAIL_2FA,
+        testName: 'Email Delivery & 2FA Test',
         status: 'FAIL',
-        message: error.message || 'Email delivery failed',
-        details: `Failed to deliver test email to ${userEmail}. ${error.message || 'Unknown error occurred'}`,
+        message: error.message || 'Email delivery or 2FA verification failed',
+        details: `Failed to deliver test email to ${userEmail} or verify 2FA code. ${error.message || 'Unknown error occurred'}`,
         timestamp: new Date(),
         recommendations: [
           'Check if the email address is correct',
@@ -189,131 +178,50 @@ const TestRunner: React.FC = () => {
   };
 
   const runTest3 = async (results: TestResult[]) => {
+    // File Download Test - wait for button click
     setCurrentTestIndex(2);
-    updateTestResult(2, { ...results[2], status: 'RUNNING', message: 'Sending 2FA code...' });
+    setShowDownloadButton(true);
     
-    const startTime = Date.now();
-    
-    try {
-      // Send 2FA code
-      const sendResult = await apiService.send2FACode(userEmail);
-      
-      if (!sendResult.success) {
-        throw new Error(sendResult.message || 'Failed to send 2FA code');
-      }
-      
-      // Record when 2FA was sent
-      tfaSentTimeRef.current = Date.now();
-      setWaitingFor2FAVerification(true);
-      setTfaCode('');
-      
-      updateTestResult(2, { 
-        ...results[2], 
-        status: 'RUNNING', 
-        message: '2FA code sent. Waiting for verification...' 
-      });
-      
-      // Wait for user to enter and verify the code
-      const code = await new Promise<string>((resolve, reject) => {
-        tfaVerificationResolveRef.current = resolve;
-        
-        // Timeout after 5 minutes
-        setTimeout(() => {
-          if (tfaVerificationResolveRef.current) {
-            tfaVerificationResolveRef.current = null;
-            setWaitingFor2FAVerification(false);
-            reject(new Error('2FA verification timeout'));
-          }
-        }, 300000); // 5 minutes
-      });
-      
-      // Calculate delivery time (this is the KEY metric for 2FA)
-      const deliveryTime = (Date.now() - tfaSentTimeRef.current) / 1000;
-      const duration = (Date.now() - startTime) / 1000;
-      
-      // Determine status based on delivery time
-      let status: 'PASS' | 'WARNING' | 'FAIL';
-      let message: string;
-      let recommendations: string[] = [];
-      
-      if (deliveryTime <= 5) {
-        status = 'PASS';
-        message = `Excellent! 2FA code delivered in ${deliveryTime.toFixed(2)} seconds`;
-      } else if (deliveryTime <= 30) {
-        status = 'WARNING';
-        message = `2FA code delivered in ${deliveryTime.toFixed(2)} seconds (acceptable but slower than optimal)`;
-        recommendations = [
-          '2FA delivery time is acceptable but could be improved',
-          'Consider optimizing email server settings for faster delivery',
-          'Users may experience slight delays during login'
-        ];
-      } else {
-        status = 'FAIL';
-        message = `2FA code delivery is too slow: ${deliveryTime.toFixed(2)} seconds`;
-        recommendations = [
-          'Critical: 2FA delivery time exceeds acceptable limits',
-          'Users will experience significant delays during authentication',
-          'Email server optimization required',
-          'Consider alternative 2FA delivery methods (SMS, authenticator app)'
-        ];
-      }
-      
-      updateTestResult(2, {
-        id: '3',
-        type: TestType.EMAIL_2FA,
-        testName: 'Email 2FA Timing Test',
-        status,
-        message,
-        details: `2FA code was delivered to ${userEmail} in ${deliveryTime.toFixed(2)} seconds. ${status === 'PASS' ? 'This meets the requirement for secure and timely authentication.' : status === 'WARNING' ? 'This is within acceptable limits but may cause minor user experience issues.' : 'This is too slow for reliable 2FA authentication.'}`,
-        timestamp: new Date(),
-        recommendations,
-        duration,
-        metadata: {
-          email: userEmail,
-          deliveryTime: parseFloat(deliveryTime.toFixed(2)),
-          code: code,
-          threshold: deliveryTime <= 5 ? 'optimal' : deliveryTime <= 30 ? 'acceptable' : 'too-slow'
-        }
-      });
-      
-    } catch (error: any) {
-      const duration = (Date.now() - startTime) / 1000;
-      setWaitingFor2FAVerification(false);
-      
-      updateTestResult(2, {
-        id: '3',
-        type: TestType.EMAIL_2FA,
-        testName: 'Email 2FA Timing Test',
-        status: 'FAIL',
-        message: error.message || '2FA delivery failed',
-        details: `Failed to deliver 2FA code to ${userEmail}. ${error.message || 'Unknown error occurred'}`,
-        timestamp: new Date(),
-        recommendations: [
-          'Check if the email address is correct',
-          'Check your spam/junk folder',
-          'Verify email server is not blocking 2FA emails',
-          'Contact your IT department if issue persists'
-        ],
-        duration,
-        blockers: [
-          '2FA code not delivered',
-          error.message || 'Unknown error'
-        ]
-      });
-    }
+    updateTestResult(2, {
+      id: '3',
+      type: TestType.FILE_DOWNLOAD,
+      testName: 'File Download Test',
+      status: 'PENDING',
+      message: 'Click "Download Test Files" to begin',
+      details: 'Please click the green download button below to test file download capabilities.',
+      timestamp: new Date(),
+      recommendations: [],
+      duration: 0,
+    });
   };
 
-  const runTest4 = async (results: TestResult[]) => {
-    // File Download Test
-    setCurrentTestIndex(3);
-    updateTestResult(3, { ...results[3], status: 'RUNNING', message: 'Downloading test files...' });
+  // Function to handle download button click
+  const handleDownloadFiles = async () => {
+    setShowDownloadButton(false);
+    
+    updateTestResult(2, { 
+      id: '3',
+      type: TestType.FILE_DOWNLOAD,
+      testName: 'File Download Test',
+      status: 'RUNNING', 
+      message: 'Downloading test files...',
+      details: '',
+      timestamp: new Date(),
+      recommendations: [],
+      duration: 0,
+    });
     
     try {
       const result = await testService.runFileDownloadTest();
-      updateTestResult(3, result);
+      updateTestResult(2, result);
+      
+      // After successful download, show upload button
+      if (result.status === 'PASS') {
+        setShowUploadButton(true);
+      }
     } catch (error: any) {
-      updateTestResult(3, {
-        id: '4',
+      updateTestResult(2, {
+        id: '3',
         type: TestType.FILE_DOWNLOAD,
         testName: 'File Download Test',
         status: 'FAIL',
@@ -327,33 +235,31 @@ const TestRunner: React.FC = () => {
     }
   };
 
-  const runTest5 = async (results: TestResult[]) => {
-    // File Upload Test
-    setCurrentTestIndex(4);
-    updateTestResult(4, { ...results[4], status: 'RUNNING', message: 'Waiting for file selection...' });
+  const runTest4 = async (results: TestResult[]) => {
+    // File Upload Test - wait for button click
+    setCurrentTestIndex(3);
     
-    // Wait for user to select files
-    // This test will be triggered by the file input onChange event
-    // For now, we'll show a message prompting the user
-    updateTestResult(4, {
-      id: '5',
+    updateTestResult(3, {
+      id: '4',
       type: TestType.FILE_UPLOAD,
       testName: 'File Upload Test',
       status: 'PENDING',
-      message: 'Please select and upload the downloaded files',
-      details: 'Use the file input below to select the files you just downloaded',
+      message: 'Click "Upload Test Files" to begin',
+      details: 'Please click the orange upload button below to select and upload the downloaded files.',
       timestamp: new Date(),
-      recommendations: ['Select the downloaded files to proceed with upload test'],
+      recommendations: [],
       duration: 0,
     });
   };
 
-  // Separate function to handle file upload when user selects files
+  // Function to handle file upload
   const handleFileUpload = async (files: FileList) => {
     if (!files || files.length === 0) return;
 
-    updateTestResult(4, {
-      id: '5',
+    setShowUploadButton(false);
+
+    updateTestResult(3, {
+      id: '4',
       type: TestType.FILE_UPLOAD,
       testName: 'File Upload Test',
       status: 'RUNNING',
@@ -366,10 +272,10 @@ const TestRunner: React.FC = () => {
 
     try {
       const result = await testService.runFileUploadTest(files);
-      updateTestResult(4, result);
+      updateTestResult(3, result);
     } catch (error: any) {
-      updateTestResult(4, {
-        id: '5',
+      updateTestResult(3, {
+        id: '4',
         type: TestType.FILE_UPLOAD,
         testName: 'File Upload Test',
         status: 'FAIL',
@@ -383,11 +289,19 @@ const TestRunner: React.FC = () => {
     }
   };
 
+  const runTest5 = async (results: TestResult[]) => {
+    setCurrentTestIndex(4);
+    updateTestResult(4, { ...results[4], status: 'RUNNING', message: 'Running test...' });
+    
+    const result = await testService.runIntercomTest();
+    updateTestResult(4, result);
+  };
+
   const runTest6 = async (results: TestResult[]) => {
     setCurrentTestIndex(5);
     updateTestResult(5, { ...results[5], status: 'RUNNING', message: 'Running test...' });
     
-    const result = await testService.runIntercomTest();
+    const result = await testService.runScreenResolutionTest();
     updateTestResult(5, result);
   };
 
@@ -395,16 +309,8 @@ const TestRunner: React.FC = () => {
     setCurrentTestIndex(6);
     updateTestResult(6, { ...results[6], status: 'RUNNING', message: 'Running test...' });
     
-    const result = await testService.runScreenResolutionTest();
-    updateTestResult(6, result);
-  };
-
-  const runTest8 = async (results: TestResult[]) => {
-    setCurrentTestIndex(7);
-    updateTestResult(7, { ...results[7], status: 'RUNNING', message: 'Running test...' });
-    
     const result = await testService.runConnectionSpeedTest();
-    updateTestResult(7, result);
+    updateTestResult(6, result);
   };
 
   if (isComplete) {
@@ -426,7 +332,7 @@ const TestRunner: React.FC = () => {
             
             <p className="text-lg text-gray-700 mb-6">
               This application will test your environment's compatibility with the ILex platform
-              by running 8 critical security and connectivity tests.
+              by running 7 critical security and connectivity tests.
             </p>
             
             <div className="bg-blue-50 border-l-4 border-blue-500 p-6 mb-8 text-left">
@@ -515,45 +421,11 @@ const TestRunner: React.FC = () => {
           />
         </div>
 
-        {waitingForEmailVerification && (
-          <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-6 mb-6">
-            <h3 className="font-bold text-yellow-900 mb-3">📧 Email Verification Required</h3>
-            <p className="text-yellow-800 mb-4">
-              Check your email ({userEmail}) and enter the 6-digit code below:
-            </p>
-            <div className="flex flex-col md:flex-row gap-3">
-              <input
-                type="text"
-                value={emailCode}
-                onChange={(e) => setEmailCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                onKeyPress={(e) => e.key === 'Enter' && emailCode.length === 6 && handleEmailVerification()}
-                placeholder="000000"
-                maxLength={6}
-                className="flex-1 md:w-64 px-4 py-3 border-2 border-yellow-400 rounded-lg focus:border-yellow-600 focus:outline-none text-xl text-center font-mono tracking-widest"
-              />
-              <button
-                onClick={handleEmailVerification}
-                disabled={emailCode.length !== 6}
-                className={`px-8 py-3 rounded-lg font-semibold transition-colors text-lg ${
-                  emailCode.length === 6
-                    ? 'bg-yellow-500 text-white hover:bg-yellow-600 cursor-pointer shadow-md'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                }`}
-              >
-                Verify Code
-              </button>
-            </div>
-            <p className="text-sm text-yellow-700 mt-3">
-              💡 Enter the 6-digit code from your email and click "Verify Code" or press Enter
-            </p>
-          </div>
-        )}
-
         {waitingFor2FAVerification && (
           <div className="bg-blue-50 border-2 border-blue-400 rounded-lg p-6 mb-6">
-            <h3 className="font-bold text-blue-900 mb-3">🔐 2FA Code Required</h3>
+            <h3 className="font-bold text-blue-900 mb-3">📧 Email Delivery & 2FA Verification</h3>
             <p className="text-blue-800 mb-4">
-              Check your email ({userEmail}) and enter the 6-digit 2FA code below:
+              Check your email ({userEmail}) and enter the 6-digit code below:
             </p>
             <div className="flex flex-col md:flex-row gap-3">
               <input
@@ -578,27 +450,53 @@ const TestRunner: React.FC = () => {
               </button>
             </div>
             <p className="text-sm text-blue-700 mt-3">
-              💡 This test measures 2FA delivery speed. Enter the code quickly for accurate timing!
+              💡 Enter the 6-digit code from your email and click "Verify Code" or press Enter
             </p>
           </div>
         )}
 
-        {/* File Upload Section for Test 5 */}
-        {currentTestIndex >= 4 && testResults[4]?.status === 'PENDING' && (
+        {/* Download Test Button */}
+        {showDownloadButton && (
           <div className="bg-green-50 border-2 border-green-400 rounded-lg p-6 mb-6">
-            <h3 className="font-bold text-green-900 mb-3">📁 File Upload Test</h3>
+            <h3 className="font-bold text-green-900 mb-3">📥 File Download Test</h3>
             <p className="text-green-800 mb-4">
-              Please select the files you just downloaded to test the upload functionality:
+              Click the button below to download test files and verify download functionality:
+            </p>
+            <button
+              onClick={handleDownloadFiles}
+              className="w-full px-8 py-4 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 transition-colors text-lg shadow-md"
+            >
+              Download Test Files
+            </button>
+            <p className="text-sm text-green-700 mt-2">
+              💡 This will download 3 test files to verify your environment's download capabilities
+            </p>
+          </div>
+        )}
+
+        {/* Upload Test Button */}
+        {showUploadButton && (
+          <div className="bg-orange-50 border-2 border-orange-400 rounded-lg p-6 mb-6">
+            <h3 className="font-bold text-orange-900 mb-3">� File Upload Test</h3>
+            <p className="text-orange-800 mb-4">
+              Select the files you just downloaded to test upload functionality:
             </p>
             <input
               type="file"
               multiple
               accept=".docx,.xlsx,.jpg,.jpeg,.txt,.pdf,.zip"
               onChange={(e) => e.target.files && handleFileUpload(e.target.files)}
-              className="w-full px-4 py-3 border-2 border-green-400 rounded-lg focus:border-green-600 focus:outline-none bg-white cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-500 file:text-white hover:file:bg-green-600"
+              className="hidden"
+              id="upload-test-input"
             />
-            <p className="text-sm text-green-700 mt-2">
-              💡 Tip: Select all 3 files that were downloaded in the previous test (Word, Excel, and Image)
+            <label
+              htmlFor="upload-test-input"
+              className="block w-full px-8 py-4 bg-orange-500 text-white rounded-lg font-semibold hover:bg-orange-600 transition-colors text-lg shadow-md text-center cursor-pointer"
+            >
+              Upload Test Files
+            </label>
+            <p className="text-sm text-orange-700 mt-2">
+              💡 Select all 3 files that were downloaded in the previous test
             </p>
           </div>
         )}
