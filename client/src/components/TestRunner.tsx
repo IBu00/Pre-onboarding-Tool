@@ -626,21 +626,6 @@ const TestRunner: React.FC = () => {
             </p>
           </div>
         )}
-
-        <div className="space-y-4">
-          {TEST_CONFIGS.map((config, index) => (
-            <TestCard
-              key={config.id}
-              testNumber={parseInt(config.id)}
-              testName={config.name}
-              description={config.description}
-              status={testResults[index]?.status || 'PENDING'}
-              duration={testResults[index]?.duration}
-              estimatedTime={config.estimatedTime}
-              isCurrentTest={index === currentTestIndex}
-            />
-          ))}
-        </div>
       </div>
     </div>
   );

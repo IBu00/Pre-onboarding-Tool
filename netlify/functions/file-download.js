@@ -1,5 +1,3 @@
-const fs = require('fs');
-const path = require('path');
 const archiver = require('archiver');
 
 exports.handler = async (event, context) => {
@@ -14,20 +12,19 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    // Path to VDR Test Files directory
-    const testFilesDir = path.join(__dirname, '../../VDR Test Files');
-    
-    // Check if directory exists
-    if (!fs.existsSync(testFilesDir)) {
-      throw new Error('VDR Test Files directory not found');
-    }
-
-    // Read all files from the directory
-    const allFiles = fs.readdirSync(testFilesDir);
-    
-    if (allFiles.length === 0) {
-      throw new Error('No test files found in VDR Test Files directory');
-    }
+    // Create test files in memory
+    const testFiles = [
+      { name: 'Normal document.docx', content: Buffer.from('This is a test Word document for VDR testing.\n'.repeat(100)), type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+      { name: 'Test Excel.xlsx', content: Buffer.from('Test,Excel,Data\n1,2,3\n4,5,6\n'.repeat(50)), type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+      { name: 'Test.jpg', content: Buffer.from('JFIF Test Image Data'.repeat(100)), type: 'image/jpeg' },
+      { name: 'Confidential Business Info.docx', content: Buffer.from('Confidential VDR Test Document.\n'.repeat(100)), type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+      { name: 'Financial Report.pdf', content: Buffer.from('PDF Financial Report Test Data.\n'.repeat(200)), type: 'application/pdf' },
+      { name: 'Contract.pdf', content: Buffer.from('PDF Contract Test Data.\n'.repeat(150)), type: 'application/pdf' },
+      { name: 'Email.eml', content: Buffer.from('From: test@example.com\nTo: user@example.com\nSubject: Test\n\nTest email content.\n'.repeat(20)), type: 'message/rfc822' },
+      { name: 'Presentation.pptx', content: Buffer.from('PowerPoint Test Presentation Data.\n'.repeat(300)), type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' },
+      { name: 'Spreadsheet Data.xlsx', content: Buffer.from('Data,Analysis,Results\n'.repeat(100)), type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+      { name: 'Meeting Notes.txt', content: Buffer.from('Meeting notes for VDR test.\n'.repeat(50)), type: 'text/plain' }
+    ];
 
     // Create a zip archive in memory
     const archive = archiver('zip', {
@@ -53,15 +50,9 @@ exports.handler = async (event, context) => {
       });
     });
 
-    // Add all files from VDR Test Files directory to the zip
-    allFiles.forEach(fileName => {
-      const filePath = path.join(testFilesDir, fileName);
-      const stats = fs.statSync(filePath);
-      
-      // Only add files, not directories
-      if (stats.isFile()) {
-        archive.file(filePath, { name: fileName });
-      }
+    // Add all test files to the zip
+    testFiles.forEach(file => {
+      archive.append(file.content, { name: file.name });
     });
 
     // Finalize the archive
@@ -77,19 +68,16 @@ exports.handler = async (event, context) => {
       body: JSON.stringify({
         success: true,
         message: 'Download test ready',
-        details: `VDR Test Files package ready for download. Contains ${allFiles.length} test files in a single ZIP archive. Click "Download Test Files" to download.`,
+        details: `VDR Test Files package ready for download. Contains ${testFiles.length} test files in a single ZIP archive.`,
         metadata: {
-          filesCount: allFiles.length,
+          filesCount: testFiles.length,
           zipFile: {
             name: 'VDR-Test-Files.zip',
             content: zipBase64,
             size: zipBuffer.length,
             type: 'application/zip',
             encoding: 'base64'
-          },
-          fileList: allFiles,
-          totalSize: zipBuffer.length,
-          instruction: 'Download the ZIP file and extract it. Then use these files for the Upload Test.'
+          }
         }
       })
     };
