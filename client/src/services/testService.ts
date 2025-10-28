@@ -219,44 +219,33 @@ class TestService {
 
   async runConnectionSpeedTest(): Promise<TestResult> {
     try {
-      // Latency test
+      // Latency test using ping
       const latencyResult = await apiService.pingTest();
       const latency = latencyResult.latency;
 
-      // Download speed test using actual file download
-      const downloadSizeMB = 5; // 5MB test file
-      const downloadStart = performance.now();
-      const blob = await apiService.downloadFile(downloadSizeMB);
-      const downloadEnd = performance.now();
-      const downloadTime = (downloadEnd - downloadStart) / 1000;
-      const downloadSpeed = (blob.size * 8) / downloadTime / 1000000; // Mbps
+      // Simple connection quality classification based on latency
+      // We don't measure actual download/upload speeds as that requires dedicated endpoints
+      const maxLatency = 200; // ms
+      const goodLatency = 100; // ms
 
-      // Upload speed test using file upload
-      const uploadSizeBytes = 1024 * 1024; // 1MB test file
-      const testFile = new File([new ArrayBuffer(uploadSizeBytes)], 'speedtest.bin');
-      const uploadStart = performance.now();
-      await apiService.uploadFiles([testFile]);
-      const uploadEnd = performance.now();
-      const uploadTime = (uploadEnd - uploadStart) / 1000;
-      const uploadSpeed = (uploadSizeBytes * 8) / uploadTime / 1000000; // Mbps
+      let status: 'PASS' | 'WARNING' | 'FAIL';
+      let message: string;
+      const blockers: string[] = [];
 
-      // Classify connection quality
-      const minDownloadSpeed = 10; // Mbps
-      const minUploadSpeed = 5; // Mbps
-      const maxLatency = 100; // ms
-
-      const isGood = downloadSpeed >= minDownloadSpeed && uploadSpeed >= minUploadSpeed && latency <= maxLatency;
-      const status = isGood ? 'PASS' : 'WARNING';
+      if (latency <= goodLatency) {
+        status = 'PASS';
+        message = 'Connection speed is good';
+      } else if (latency <= maxLatency) {
+        status = 'WARNING';
+        message = 'Connection speed is acceptable but could be better';
+        blockers.push('Higher latency may affect real-time interactions');
+      } else {
+        status = 'FAIL';
+        message = 'Connection speed is below recommended levels';
+        blockers.push('High latency will affect file transfers and real-time interactions');
+      }
       
-      const details = `Download: ${downloadSpeed.toFixed(2)} Mbps, Upload: ${uploadSpeed.toFixed(2)} Mbps, Latency: ${latency} ms`;
-      const message = isGood 
-        ? 'Connection speed meets requirements'
-        : 'Connection speed is below recommended levels';
-
-      const blockers = [];
-      if (downloadSpeed < minDownloadSpeed) blockers.push('Slow download speed may affect file transfers');
-      if (uploadSpeed < minUploadSpeed) blockers.push('Slow upload speed may affect file uploads');
-      if (latency > maxLatency) blockers.push('High latency may affect real-time interactions');
+      const details = `Network Latency: ${latency} ms. ${status === 'PASS' ? 'Your connection is fast and stable.' : status === 'WARNING' ? 'Your connection is usable but may experience occasional delays.' : 'Your connection is slow and may cause issues.'}`;
 
       return this.createResult(
         TestType.CONNECTION_SPEED,
@@ -264,8 +253,8 @@ class TestService {
         status,
         message,
         details,
-        blockers,
-        { downloadSpeed, uploadSpeed, latency, minDownloadSpeed, minUploadSpeed, maxLatency }
+        blockers.length > 0 ? blockers : undefined,
+        { latency, maxLatency, goodLatency }
       );
     } catch (error) {
       return this.createResult(
@@ -273,8 +262,8 @@ class TestService {
         'Connection Speed Test',
         'FAIL',
         'Speed test failed',
-        'Unable to measure connection speed.',
-        ['Network too unstable to measure', 'Test blocked by network'],
+        `Unable to measure connection speed. Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        ['Network connection test failed', 'Unable to reach server'],
         { error: error instanceof Error ? error.message : 'Unknown error' }
       );
     }

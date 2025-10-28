@@ -9,6 +9,7 @@ interface TestCardProps {
   duration?: number;
   estimatedTime: string;
   isCurrentTest: boolean;
+  children?: React.ReactNode;
 }
 
 const TestCard: React.FC<TestCardProps> = ({
@@ -19,6 +20,7 @@ const TestCard: React.FC<TestCardProps> = ({
   duration,
   estimatedTime,
   isCurrentTest,
+  children,
 }) => {
   const statusColors = {
     PASS: 'bg-green-500',
@@ -57,6 +59,13 @@ const TestCard: React.FC<TestCardProps> = ({
             <h3 className="text-xl font-semibold text-gray-800">{testName}</h3>
           </div>
           <p className="text-sm text-gray-600 mt-2 ml-10">{description}</p>
+          
+          {children && (
+            <div className="ml-10 mt-4">
+              {children}
+            </div>
+          )}
+          
           <div className="flex items-center space-x-4 ml-10 mt-3">
             <span className="text-xs text-gray-500">
               Estimated: {estimatedTime}

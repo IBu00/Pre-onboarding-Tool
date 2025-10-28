@@ -26,6 +26,8 @@ const TestRunner: React.FC = () => {
   
   // Refs to resolve promises from button clicks
   const tfaVerificationResolveRef = useRef<((code: string) => void) | null>(null);
+  const downloadCompleteResolveRef = useRef<(() => void) | null>(null);
+  const uploadCompleteResolveRef = useRef<(() => void) | null>(null);
 
   const startTests = async () => {
     if (!userEmail || !userEmail.includes('@')) {
@@ -193,6 +195,14 @@ const TestRunner: React.FC = () => {
       recommendations: [],
       duration: 0,
     });
+
+    // Wait for user to click download button and complete the download
+    await new Promise<void>((resolve) => {
+      downloadCompleteResolveRef.current = resolve;
+    });
+
+    // Download test is now complete, resolve ref is null
+    downloadCompleteResolveRef.current = null;
   };
 
   // Function to handle download button click
@@ -219,6 +229,11 @@ const TestRunner: React.FC = () => {
       if (result.status === 'PASS') {
         setShowUploadButton(true);
       }
+
+      // Resolve the promise to continue to next test
+      if (downloadCompleteResolveRef.current) {
+        downloadCompleteResolveRef.current();
+      }
     } catch (error: any) {
       updateTestResult(2, {
         id: '3',
@@ -232,6 +247,11 @@ const TestRunner: React.FC = () => {
         duration: 0,
         error: error.message,
       });
+
+      // Resolve promise even on failure to continue
+      if (downloadCompleteResolveRef.current) {
+        downloadCompleteResolveRef.current();
+      }
     }
   };
 
@@ -250,6 +270,14 @@ const TestRunner: React.FC = () => {
       recommendations: [],
       duration: 0,
     });
+
+    // Wait for user to click upload button and complete the upload
+    await new Promise<void>((resolve) => {
+      uploadCompleteResolveRef.current = resolve;
+    });
+
+    // Upload test is now complete, resolve ref is null
+    uploadCompleteResolveRef.current = null;
   };
 
   // Function to handle file upload
@@ -273,6 +301,11 @@ const TestRunner: React.FC = () => {
     try {
       const result = await testService.runFileUploadTest(files);
       updateTestResult(3, result);
+
+      // Resolve the promise to continue to next test
+      if (uploadCompleteResolveRef.current) {
+        uploadCompleteResolveRef.current();
+      }
     } catch (error: any) {
       updateTestResult(3, {
         id: '4',
@@ -286,6 +319,11 @@ const TestRunner: React.FC = () => {
         duration: 0,
         error: error.message,
       });
+
+      // Resolve promise even on failure to continue
+      if (uploadCompleteResolveRef.current) {
+        uploadCompleteResolveRef.current();
+      }
     }
   };
 
@@ -454,6 +492,112 @@ const TestRunner: React.FC = () => {
             </p>
           </div>
         )}
+
+        <div className="space-y-4">
+          {TEST_CONFIGS.map((config, index) => {
+            // Render custom children for specific tests
+            let children = null;
+            
+            // Test 2: Email Delivery & 2FA - show verification UI
+            if (index === 1 && waitingFor2FAVerification) {
+              children = (
+                <div className="bg-blue-50 border-2 border-blue-400 rounded-lg p-4">
+                  <p className="text-blue-800 mb-3 font-semibold">
+                    Check your email ({userEmail}) and enter the 6-digit code:
+                  </p>
+                  <div className="flex flex-col md:flex-row gap-3">
+                    <input
+                      type="text"
+                      value={tfaCode}
+                      onChange={(e) => setTfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      onKeyPress={(e) => e.key === 'Enter' && tfaCode.length === 6 && handleTfaVerification()}
+                      placeholder="000000"
+                      maxLength={6}
+                      className="flex-1 md:w-64 px-4 py-3 border-2 border-blue-400 rounded-lg focus:border-blue-600 focus:outline-none text-xl text-center font-mono tracking-widest"
+                    />
+                    <button
+                      onClick={handleTfaVerification}
+                      disabled={tfaCode.length !== 6}
+                      className={`px-8 py-3 rounded-lg font-semibold transition-colors text-lg ${
+                        tfaCode.length === 6
+                          ? 'bg-blue-500 text-white hover:bg-blue-600 cursor-pointer shadow-md'
+                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      }`}
+                    >
+                      Verify Code
+                    </button>
+                  </div>
+                  <p className="text-sm text-blue-700 mt-2">
+                    💡 Enter the code and click "Verify Code" or press Enter
+                  </p>
+                </div>
+              );
+            }
+            
+            // Test 3: File Download - show download button
+            if (index === 2 && showDownloadButton) {
+              children = (
+                <div className="bg-green-50 border-2 border-green-400 rounded-lg p-4">
+                  <p className="text-green-800 mb-3 font-semibold">
+                    Click the button below to download test files:
+                  </p>
+                  <button
+                    onClick={handleDownloadFiles}
+                    className="w-full px-8 py-4 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 transition-colors text-lg shadow-md"
+                  >
+                    📥 Download Test Files
+                  </button>
+                  <p className="text-sm text-green-700 mt-2">
+                    💡 This will download 3 test files to verify download capabilities
+                  </p>
+                </div>
+              );
+            }
+            
+            // Test 4: File Upload - show upload button
+            if (index === 3 && showUploadButton) {
+              children = (
+                <div className="bg-orange-50 border-2 border-orange-400 rounded-lg p-4">
+                  <p className="text-orange-800 mb-3 font-semibold">
+                    Select the files you just downloaded to test upload:
+                  </p>
+                  <input
+                    type="file"
+                    multiple
+                    accept=".docx,.xlsx,.jpg,.jpeg,.txt,.pdf,.zip"
+                    onChange={(e) => e.target.files && handleFileUpload(e.target.files)}
+                    className="hidden"
+                    id="upload-test-input"
+                  />
+                  <label
+                    htmlFor="upload-test-input"
+                    className="block w-full px-8 py-4 bg-orange-500 text-white rounded-lg font-semibold hover:bg-orange-600 transition-colors text-lg shadow-md text-center cursor-pointer"
+                  >
+                    📤 Upload Test Files
+                  </label>
+                  <p className="text-sm text-orange-700 mt-2">
+                    💡 Select all 3 files that were downloaded in the previous test
+                  </p>
+                </div>
+              );
+            }
+            
+            return (
+              <TestCard
+                key={config.id}
+                testNumber={parseInt(config.id)}
+                testName={config.name}
+                description={config.description}
+                status={testResults[index]?.status || 'PENDING'}
+                duration={testResults[index]?.duration}
+                estimatedTime={config.estimatedTime}
+                isCurrentTest={index === currentTestIndex}
+              >
+                {children}
+              </TestCard>
+            );
+          })}
+        </div>
 
         {/* Download Test Button */}
         {showDownloadButton && (
