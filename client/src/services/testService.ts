@@ -324,7 +324,6 @@ class TestService {
       
       let status: 'PASS' | 'WARNING' | 'FAIL';
       let message: string;
-      let recommendations: string[] = [];
       
       if (downloadSpeedMbps >= 10 && uploadSpeedMbps >= 5 && latency < 100) {
         status = 'PASS';
