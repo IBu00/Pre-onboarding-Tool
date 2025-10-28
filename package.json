@@ -1,0 +1,27 @@
+{
+  "name": "ilex-preonboarding-tool",
+  "version": "1.0.0",
+  "description": "Pre-onboarding test application for Institutional Lending Exchange",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install && cd netlify && npm install && cd ../client && npm install --legacy-peer-deps && cd ../server && npm install",
+    "dev": "concurrently --kill-others \"npm run server:dev\" \"npm run client:dev\"",
+    "server:dev": "cd server && npm run dev",
+    "client:dev": "cd client && npm start",
+    "build": "cd netlify && npm install && cd ../client && npm install --legacy-peer-deps && npm run build",
+    "client:build": "cd client && npm run build",
+    "server:build": "cd server && npm run build",
+    "server:start": "cd server && npm start"
+  },
+  "keywords": [
+    "preonboarding",
+    "testing",
+    "compatibility",
+    "ilex"
+  ],
+  "author": "Institutional Lending Exchange",
+  "license": "PROPRIETARY",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
