@@ -90,9 +90,9 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ results, onRestart }) =
             {failCount === 0 && (
               <button
                 onClick={() => window.open('https://www.institutionallendingexchange.com/', '_blank')}
-                className="flex-1 bg-accent hover:bg-green-700 text-white font-semibold py-3 px-6 rounded transition-colors animate-glow"
+                className="flex-1 bg-accent hover:bg-green-700 text-white font-semibold py-3 px-6 rounded transition-colors shadow-[0_0_15px_rgba(0,168,107,0.5)] hover:shadow-[0_0_25px_rgba(0,168,107,0.7)]"
               >
-                Proceed to iLex
+                Proceed to iLex →
               </button>
             )}
           </div>
