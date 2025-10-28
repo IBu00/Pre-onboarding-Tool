@@ -559,6 +559,9 @@ const TestRunner: React.FC = () => {
                     📤 Upload Test Files
                   </label>
                   <p className="text-sm text-orange-700 mt-2">
+                    💡 Upload the files you downloaded from the ZIP. You can also upload any other files to test various file types and sizes.
+                  </p>
+                  <p className="text-sm text-orange-700 mt-2">
                     💡 You can upload the files you just downloaded or any other files
                   </p>
                 </div>
