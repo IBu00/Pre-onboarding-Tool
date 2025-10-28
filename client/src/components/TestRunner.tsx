@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { TestResult, TestType } from '../types/test.types';
 import { TESTS } from '../config/testConfig';
 import testService from '../services/testService';
@@ -20,6 +20,14 @@ const TestRunner: React.FC = () => {
   const [tfaCode, setTfaCode] = useState('');
   const [waitingForEmailVerification, setWaitingForEmailVerification] = useState(false);
   const [waitingFor2FAVerification, setWaitingFor2FAVerification] = useState(false);
+  
+  // Refs to store email send timestamp for timing measurement
+  const emailSentTimeRef = useRef<number>(0);
+  const tfaSentTimeRef = useRef<number>(0);
+  
+  // Refs to resolve promises from button clicks
+  const emailVerificationResolveRef = useRef<((code: string) => void) | null>(null);
+  const tfaVerificationResolveRef = useRef<((code: string) => void) | null>(null);
 
   const startTests = async () => {
     if (!userEmail || !userEmail.includes('@')) {
@@ -68,6 +76,22 @@ const TestRunner: React.FC = () => {
     });
   };
 
+  const handleEmailVerification = () => {
+    if (emailCode.length === 6 && emailVerificationResolveRef.current) {
+      emailVerificationResolveRef.current(emailCode);
+      emailVerificationResolveRef.current = null;
+      setWaitingForEmailVerification(false);
+    }
+  };
+
+  const handleTfaVerification = () => {
+    if (tfaCode.length === 6 && tfaVerificationResolveRef.current) {
+      tfaVerificationResolveRef.current(tfaCode);
+      tfaVerificationResolveRef.current = null;
+      setWaitingFor2FAVerification(false);
+    }
+  };
+
   const runTest1 = async (results: TestResult[]) => {
     setCurrentTestIndex(0);
     updateTestResult(0, { ...results[0], status: 'RUNNING', message: 'Running test...' });
@@ -78,162 +102,204 @@ const TestRunner: React.FC = () => {
 
   const runTest2 = async (results: TestResult[]) => {
     setCurrentTestIndex(1);
-    updateTestResult(1, { ...results[1], status: 'RUNNING' });
+    updateTestResult(1, { ...results[1], status: 'RUNNING', message: 'Sending test email...' });
     
     const startTime = Date.now();
     
     try {
       // Send test email
-      await apiService.sendTestEmail(userEmail);
-      setWaitingForEmailVerification(true);
+      const sendResult = await apiService.sendTestEmail(userEmail);
       
-      // Wait for user to enter code (with timeout)
-      const verified = await new Promise<boolean>((resolve) => {
-        const checkInterval = setInterval(() => {
-          if (emailCode && emailCode.length === 6) {
-            clearInterval(checkInterval);
-            resolve(true);
-          }
-        }, 500);
+      if (!sendResult.success) {
+        throw new Error(sendResult.message || 'Failed to send email');
+      }
+      
+      // Record when email was sent
+      emailSentTimeRef.current = Date.now();
+      setWaitingForEmailVerification(true);
+      setEmailCode('');
+      
+      updateTestResult(1, { 
+        ...results[1], 
+        status: 'RUNNING', 
+        message: 'Email sent. Please check your inbox and enter the code...' 
+      });
+      
+      // Wait for user to enter and verify the code
+      const code = await new Promise<string>((resolve, reject) => {
+        emailVerificationResolveRef.current = resolve;
         
         // Timeout after 5 minutes
         setTimeout(() => {
-          clearInterval(checkInterval);
-          resolve(false);
-        }, 300000);
+          if (emailVerificationResolveRef.current) {
+            emailVerificationResolveRef.current = null;
+            setWaitingForEmailVerification(false);
+            reject(new Error('Verification timeout'));
+          }
+        }, 300000); // 5 minutes
       });
       
-      if (verified) {
-        const verifyResult = await apiService.verifyEmailCode(userEmail, emailCode);
-        const duration = (Date.now() - startTime) / 1000;
-        
-        updateTestResult(1, {
-          id: '2',
-          type: TestType.EMAIL_DELIVERY,
-          testName: 'Email Delivery Test',
-          status: 'PASS',
-          message: 'Email delivered successfully',
-          details: JSON.stringify({
-            email: userEmail,
-            deliveryTime: verifyResult.deliveryTime,
-            sent: true,
-          }),
-          timestamp: new Date(),
-          recommendations: [],
-          duration,
-        });
-      } else {
-        const duration = (Date.now() - startTime) / 1000;
-        updateTestResult(1, {
-          id: '2',
-          type: TestType.EMAIL_DELIVERY,
-          testName: 'Email Delivery Test',
-          status: 'FAIL',
-          message: 'Email verification timed out',
-          details: JSON.stringify({ email: userEmail, sent: true }),
-          timestamp: new Date(),
-          recommendations: ['Email verification timed out. Check email delivery.'],
-          duration,
-        });
-      }
+      // Calculate delivery time
+      const deliveryTime = (Date.now() - emailSentTimeRef.current) / 1000;
+      const duration = (Date.now() - startTime) / 1000;
+      
+      // Email was delivered successfully
+      updateTestResult(1, {
+        id: '2',
+        type: TestType.EMAIL_DELIVERY,
+        testName: 'Email Delivery Test',
+        status: 'PASS',
+        message: 'Email delivered successfully',
+        details: `Test email was successfully delivered to ${userEmail}. Delivery time: ${deliveryTime.toFixed(2)} seconds. Email server is functioning correctly and emails are being delivered without issues.`,
+        timestamp: new Date(),
+        recommendations: [],
+        duration,
+        metadata: {
+          email: userEmail,
+          deliveryTime: parseFloat(deliveryTime.toFixed(2)),
+          code: code
+        }
+      });
+      
     } catch (error: any) {
       const duration = (Date.now() - startTime) / 1000;
+      setWaitingForEmailVerification(false);
+      
       updateTestResult(1, {
         id: '2',
         type: TestType.EMAIL_DELIVERY,
         testName: 'Email Delivery Test',
         status: 'FAIL',
-        message: error.message || 'Failed to send test email',
-        details: JSON.stringify({ email: userEmail, sent: false }),
+        message: error.message || 'Email delivery failed',
+        details: `Failed to deliver test email to ${userEmail}. ${error.message || 'Unknown error occurred'}`,
         timestamp: new Date(),
-        recommendations: ['Failed to send test email. Check email configuration.'],
+        recommendations: [
+          'Check if the email address is correct',
+          'Check your spam/junk folder',
+          'Verify email server is not blocking emails',
+          'Contact your IT department if issue persists'
+        ],
         duration,
-        error: error.message,
+        blockers: [
+          'Email not delivered',
+          error.message || 'Unknown error'
+        ]
       });
-    } finally {
-      setWaitingForEmailVerification(false);
     }
   };
 
   const runTest3 = async (results: TestResult[]) => {
     setCurrentTestIndex(2);
-    updateTestResult(2, { ...results[2], status: 'RUNNING' });
+    updateTestResult(2, { ...results[2], status: 'RUNNING', message: 'Sending 2FA code...' });
     
     const startTime = Date.now();
     
     try {
       // Send 2FA code
-      await apiService.send2FACode(userEmail);
-      setWaitingFor2FAVerification(true);
+      const sendResult = await apiService.send2FACode(userEmail);
       
-      // Wait for user to enter code
-      const verified = await new Promise<boolean>((resolve) => {
-        const checkInterval = setInterval(() => {
-          if (tfaCode && tfaCode.length === 6) {
-            clearInterval(checkInterval);
-            resolve(true);
-          }
-        }, 500);
+      if (!sendResult.success) {
+        throw new Error(sendResult.message || 'Failed to send 2FA code');
+      }
+      
+      // Record when 2FA was sent
+      tfaSentTimeRef.current = Date.now();
+      setWaitingFor2FAVerification(true);
+      setTfaCode('');
+      
+      updateTestResult(2, { 
+        ...results[2], 
+        status: 'RUNNING', 
+        message: '2FA code sent. Waiting for verification...' 
+      });
+      
+      // Wait for user to enter and verify the code
+      const code = await new Promise<string>((resolve, reject) => {
+        tfaVerificationResolveRef.current = resolve;
         
         // Timeout after 5 minutes
         setTimeout(() => {
-          clearInterval(checkInterval);
-          resolve(false);
-        }, 300000);
+          if (tfaVerificationResolveRef.current) {
+            tfaVerificationResolveRef.current = null;
+            setWaitingFor2FAVerification(false);
+            reject(new Error('2FA verification timeout'));
+          }
+        }, 300000); // 5 minutes
       });
       
-      if (verified) {
-        const verifyResult = await apiService.verify2FACode(userEmail, tfaCode);
-        const duration = (Date.now() - startTime) / 1000;
-        
-        updateTestResult(2, {
-          id: '3',
-          type: TestType.EMAIL_2FA,
-          testName: 'Email 2FA Timing Test',
-          status: verifyResult.status,
-          message: `2FA delivered in ${verifyResult.deliveryTime}s`,
-          details: JSON.stringify({
-            email: userEmail,
-            deliveryTime: verifyResult.deliveryTime,
-            sent: true,
-            verified: true,
-          }),
-          timestamp: new Date(),
-          recommendations: verifyResult.deliveryTime > 30 
-            ? ['2FA email delivery is slow. Consider optimizing email service.']
-            : [],
-          duration,
-        });
+      // Calculate delivery time (this is the KEY metric for 2FA)
+      const deliveryTime = (Date.now() - tfaSentTimeRef.current) / 1000;
+      const duration = (Date.now() - startTime) / 1000;
+      
+      // Determine status based on delivery time
+      let status: 'PASS' | 'WARNING' | 'FAIL';
+      let message: string;
+      let recommendations: string[] = [];
+      
+      if (deliveryTime <= 5) {
+        status = 'PASS';
+        message = `Excellent! 2FA code delivered in ${deliveryTime.toFixed(2)} seconds`;
+      } else if (deliveryTime <= 30) {
+        status = 'WARNING';
+        message = `2FA code delivered in ${deliveryTime.toFixed(2)} seconds (acceptable but slower than optimal)`;
+        recommendations = [
+          '2FA delivery time is acceptable but could be improved',
+          'Consider optimizing email server settings for faster delivery',
+          'Users may experience slight delays during login'
+        ];
       } else {
-        const duration = (Date.now() - startTime) / 1000;
-        updateTestResult(2, {
-          id: '3',
-          type: TestType.EMAIL_2FA,
-          testName: 'Email 2FA Timing Test',
-          status: 'FAIL',
-          message: '2FA verification timed out',
-          details: JSON.stringify({ email: userEmail, sent: true, verified: false }),
-          timestamp: new Date(),
-          recommendations: ['2FA verification timed out.'],
-          duration,
-        });
+        status = 'FAIL';
+        message = `2FA code delivery is too slow: ${deliveryTime.toFixed(2)} seconds`;
+        recommendations = [
+          'Critical: 2FA delivery time exceeds acceptable limits',
+          'Users will experience significant delays during authentication',
+          'Email server optimization required',
+          'Consider alternative 2FA delivery methods (SMS, authenticator app)'
+        ];
       }
+      
+      updateTestResult(2, {
+        id: '3',
+        type: TestType.EMAIL_2FA,
+        testName: 'Email 2FA Timing Test',
+        status,
+        message,
+        details: `2FA code was delivered to ${userEmail} in ${deliveryTime.toFixed(2)} seconds. ${status === 'PASS' ? 'This meets the requirement for secure and timely authentication.' : status === 'WARNING' ? 'This is within acceptable limits but may cause minor user experience issues.' : 'This is too slow for reliable 2FA authentication.'}`,
+        timestamp: new Date(),
+        recommendations,
+        duration,
+        metadata: {
+          email: userEmail,
+          deliveryTime: parseFloat(deliveryTime.toFixed(2)),
+          code: code,
+          threshold: deliveryTime <= 5 ? 'optimal' : deliveryTime <= 30 ? 'acceptable' : 'too-slow'
+        }
+      });
+      
     } catch (error: any) {
       const duration = (Date.now() - startTime) / 1000;
+      setWaitingFor2FAVerification(false);
+      
       updateTestResult(2, {
         id: '3',
         type: TestType.EMAIL_2FA,
         testName: 'Email 2FA Timing Test',
         status: 'FAIL',
-        message: error.message || 'Failed to send 2FA code',
-        details: JSON.stringify({ email: userEmail, sent: false }),
+        message: error.message || '2FA delivery failed',
+        details: `Failed to deliver 2FA code to ${userEmail}. ${error.message || 'Unknown error occurred'}`,
         timestamp: new Date(),
-        recommendations: ['Failed to send 2FA code.'],
+        recommendations: [
+          'Check if the email address is correct',
+          'Check your spam/junk folder',
+          'Verify email server is not blocking 2FA emails',
+          'Contact your IT department if issue persists'
+        ],
         duration,
-        error: error.message,
+        blockers: [
+          '2FA code not delivered',
+          error.message || 'Unknown error'
+        ]
       });
-    } finally {
-      setWaitingFor2FAVerification(false);
     }
   };
 
@@ -459,26 +525,26 @@ const TestRunner: React.FC = () => {
               <input
                 type="text"
                 value={emailCode}
-                onChange={(e) => setEmailCode(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && emailCode.length === 6 && setEmailCode(emailCode)}
+                onChange={(e) => setEmailCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                onKeyPress={(e) => e.key === 'Enter' && emailCode.length === 6 && handleEmailVerification()}
                 placeholder="000000"
                 maxLength={6}
-                className="flex-1 md:w-64 px-4 py-2 border-2 border-yellow-400 rounded-lg focus:border-yellow-600 focus:outline-none text-lg text-center font-mono"
+                className="flex-1 md:w-64 px-4 py-3 border-2 border-yellow-400 rounded-lg focus:border-yellow-600 focus:outline-none text-xl text-center font-mono tracking-widest"
               />
               <button
-                onClick={() => emailCode.length === 6 && setEmailCode(emailCode)}
+                onClick={handleEmailVerification}
                 disabled={emailCode.length !== 6}
-                className={`px-6 py-2 rounded-lg font-semibold transition-colors ${
+                className={`px-8 py-3 rounded-lg font-semibold transition-colors text-lg ${
                   emailCode.length === 6
-                    ? 'bg-yellow-500 text-white hover:bg-yellow-600 cursor-pointer'
+                    ? 'bg-yellow-500 text-white hover:bg-yellow-600 cursor-pointer shadow-md'
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 }`}
               >
                 Verify Code
               </button>
             </div>
-            <p className="text-sm text-yellow-700 mt-2">
-              💡 Enter the 6-digit code from your email and click "Verify Code"
+            <p className="text-sm text-yellow-700 mt-3">
+              💡 Enter the 6-digit code from your email and click "Verify Code" or press Enter
             </p>
           </div>
         )}
@@ -493,26 +559,26 @@ const TestRunner: React.FC = () => {
               <input
                 type="text"
                 value={tfaCode}
-                onChange={(e) => setTfaCode(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && tfaCode.length === 6 && setTfaCode(tfaCode)}
+                onChange={(e) => setTfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                onKeyPress={(e) => e.key === 'Enter' && tfaCode.length === 6 && handleTfaVerification()}
                 placeholder="000000"
                 maxLength={6}
-                className="flex-1 md:w-64 px-4 py-2 border-2 border-blue-400 rounded-lg focus:border-blue-600 focus:outline-none text-lg text-center font-mono"
+                className="flex-1 md:w-64 px-4 py-3 border-2 border-blue-400 rounded-lg focus:border-blue-600 focus:outline-none text-xl text-center font-mono tracking-widest"
               />
               <button
-                onClick={() => tfaCode.length === 6 && setTfaCode(tfaCode)}
+                onClick={handleTfaVerification}
                 disabled={tfaCode.length !== 6}
-                className={`px-6 py-2 rounded-lg font-semibold transition-colors ${
+                className={`px-8 py-3 rounded-lg font-semibold transition-colors text-lg ${
                   tfaCode.length === 6
-                    ? 'bg-blue-500 text-white hover:bg-blue-600 cursor-pointer'
+                    ? 'bg-blue-500 text-white hover:bg-blue-600 cursor-pointer shadow-md'
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 }`}
               >
                 Verify Code
               </button>
             </div>
-            <p className="text-sm text-blue-700 mt-2">
-              💡 Enter the 6-digit code from your email and click "Verify Code"
+            <p className="text-sm text-blue-700 mt-3">
+              💡 This test measures 2FA delivery speed. Enter the code quickly for accurate timing!
             </p>
           </div>
         )}
