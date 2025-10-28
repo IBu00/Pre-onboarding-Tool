@@ -527,12 +527,12 @@ const TestRunner: React.FC = () => {
             <input
               type="file"
               multiple
-              accept=".txt"
+              accept=".docx,.xlsx,.jpg,.jpeg,.txt,.pdf,.zip"
               onChange={(e) => e.target.files && handleFileUpload(e.target.files)}
               className="w-full px-4 py-3 border-2 border-green-400 rounded-lg focus:border-green-600 focus:outline-none bg-white cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-500 file:text-white hover:file:bg-green-600"
             />
             <p className="text-sm text-green-700 mt-2">
-              💡 Tip: Select all 3 files that were downloaded in the previous test
+              💡 Tip: Select all 3 files that were downloaded in the previous test (Word, Excel, and Image)
             </p>
           </div>
         )}

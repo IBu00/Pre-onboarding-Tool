@@ -1,3 +1,6 @@
+const fs = require('fs');
+const path = require('path');
+
 exports.handler = async (event, context) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -10,27 +13,51 @@ exports.handler = async (event, context) => {
   }
 
   try {
+    // Path to test files directory
+    const testFilesDir = path.join(__dirname, '../test-files');
+    
     // Define test files that will be available for download
-    const testFiles = [
-      {
-        name: 'sample-document.txt',
-        content: 'This is a sample document for download testing. File 1 of 3.\n\nThis file tests basic text file downloads and verifies that your browser can download and save files from the platform.\n\nTimestamp: ' + new Date().toISOString(),
-        size: 250,
-        type: 'text/plain'
-      },
-      {
-        name: 'sample-image-data.txt',
-        content: 'This represents a sample image file for download testing. File 2 of 3.\n\nIn a real scenario, this would be an actual image file. This test verifies multi-file download capabilities.\n\nTimestamp: ' + new Date().toISOString(),
-        size: 220,
-        type: 'text/plain'
-      },
-      {
-        name: 'sample-pdf-data.txt',
-        content: 'This represents a sample PDF file for download testing. File 3 of 3.\n\nThis test ensures your browser can handle multiple file downloads in sequence without restrictions.\n\nTimestamp: ' + new Date().toISOString(),
-        size: 210,
-        type: 'text/plain'
-      }
+    const testFileNames = [
+      'Normal document.docx',
+      'Test Excel.xlsx',
+      'Test.jpg'
     ];
+
+    const testFiles = testFileNames.map(fileName => {
+      const filePath = path.join(testFilesDir, fileName);
+      let fileData = null;
+      let fileSize = 0;
+      
+      try {
+        // Check if file exists
+        if (fs.existsSync(filePath)) {
+          const stats = fs.statSync(filePath);
+          fileSize = stats.size;
+          // Read file as base64 for binary files
+          fileData = fs.readFileSync(filePath).toString('base64');
+        }
+      } catch (err) {
+        console.error(`Error reading file ${fileName}:`, err);
+      }
+
+      // Determine MIME type
+      let mimeType = 'application/octet-stream';
+      if (fileName.endsWith('.docx')) {
+        mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      } else if (fileName.endsWith('.xlsx')) {
+        mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      } else if (fileName.endsWith('.jpg') || fileName.endsWith('.jpeg')) {
+        mimeType = 'image/jpeg';
+      }
+
+      return {
+        name: fileName,
+        content: fileData,
+        size: fileSize,
+        type: mimeType,
+        encoding: 'base64'
+      };
+    }).filter(file => file.content !== null); // Only include files that were successfully read
 
     return {
       statusCode: 200,

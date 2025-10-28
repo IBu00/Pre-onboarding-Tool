@@ -60,9 +60,23 @@ class ApiService {
   }
 
   // Download all test files at once
-  async downloadAllFiles(files: Array<{ name: string; content: string; type: string }>) {
+  async downloadAllFiles(files: Array<{ name: string; content: string; type: string; encoding?: string }>) {
     files.forEach(file => {
-      const blob = new Blob([file.content], { type: file.type || 'text/plain' });
+      let blob: Blob;
+      
+      if (file.encoding === 'base64') {
+        // Decode base64 content for binary files
+        const binaryString = window.atob(file.content);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        blob = new Blob([bytes], { type: file.type || 'application/octet-stream' });
+      } else {
+        // Plain text content
+        blob = new Blob([file.content], { type: file.type || 'text/plain' });
+      }
+      
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
