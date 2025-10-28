@@ -30,14 +30,6 @@ const TestCard: React.FC<TestCardProps> = ({
     PENDING: 'bg-gray-300',
   };
 
-  const statusIcons = {
-    PASS: '✓',
-    FAIL: '✕',
-    WARNING: '!',
-    RUNNING: '...',
-    PENDING: '—',
-  };
-
   const statusText = {
     PASS: 'Passed',
     FAIL: 'Failed',

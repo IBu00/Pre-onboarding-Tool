@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { TestResult } from '../types/test.types';
 import { generatePDFReport } from '../utils/pdfGenerator';
 
@@ -15,6 +15,11 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ results, onRestart }) =
 
   const overallStatus = failCount > 0 ? 'NEEDS ATTENTION' : warnCount > 0 ? 'PASSED WITH WARNINGS' : 'ALL PASSED';
   const statusColor = failCount > 0 ? 'bg-red-500' : warnCount > 0 ? 'bg-yellow-500' : 'bg-green-500';
+
+  // Scroll to top when results are displayed
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
 
   const handleDownloadPDF = () => {
     generatePDFReport(results);
