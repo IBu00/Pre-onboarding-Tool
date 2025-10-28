@@ -332,11 +332,6 @@ class TestService {
       } else if (downloadSpeedMbps >= 5 && uploadSpeedMbps >= 2 && latency < 200) {
         status = 'WARNING';
         message = 'Connection speed is acceptable but could be improved';
-        recommendations = [
-          'Connection speed is functional but may cause delays with large files',
-          'Consider upgrading internet connection for better performance',
-          'Close bandwidth-heavy applications during platform use'
-        ];
       } else {
         status = 'FAIL';
         message = 'Connection speed is below recommended minimum';
