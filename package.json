@@ -8,7 +8,7 @@
     "dev": "concurrently --kill-others \"npm run server:dev\" \"npm run client:dev\"",
     "server:dev": "cd server && npm run dev",
     "client:dev": "cd client && npm start",
-    "build": "cd netlify && npm install && cd ../client && npm install --legacy-peer-deps && npm run build",
+    "build": "cd netlify && npm install && cd functions && npm install && cd ../../client && npm install --legacy-peer-deps && npm run build",
     "client:build": "cd client && npm run build",
     "server:build": "cd server && npm run build",
     "server:start": "cd server && npm start"
