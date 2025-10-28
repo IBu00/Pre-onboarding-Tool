@@ -111,14 +111,27 @@ export const generatePDFReport = (testResults: TestResult[]): void => {
     
     yPos += 6;
     
-    // Details
+    // Details - use the result.details string (which is human-readable)
     doc.setFontSize(9);
     doc.setTextColor(0, 0, 0);
-    const detailsText = formatDetails(result.details);
-    const splitDetails = doc.splitTextToSize(detailsText, 160);
-    doc.text(splitDetails, 25, yPos);
+    if (result.details && typeof result.details === 'string') {
+      // Use the details string directly (it's already formatted for display)
+      const splitDetails = doc.splitTextToSize(result.details, 160);
+      doc.text(splitDetails, 25, yPos);
+      yPos += splitDetails.length * 4 + 2;
+    }
     
-    yPos += splitDetails.length * 4 + 2;
+    // Metadata (if present and relevant)
+    if (result.metadata && Object.keys(result.metadata).length > 0) {
+      const metadataText = formatMetadata(result.metadata);
+      if (metadataText) {
+        doc.setFontSize(8);
+        doc.setTextColor(80, 80, 80);
+        const splitMetadata = doc.splitTextToSize(metadataText, 160);
+        doc.text(splitMetadata, 25, yPos);
+        yPos += splitMetadata.length * 3.5 + 2;
+      }
+    }
     
     // Recommendations
     if (result.recommendations && result.recommendations.length > 0) {
@@ -238,6 +251,54 @@ export const generatePDFReport = (testResults: TestResult[]): void => {
   doc.save(`ilex-preonboarding-report-${new Date().toISOString().split('T')[0]}.pdf`);
 };
 
+// Helper function to format metadata object (separate from details)
+const formatMetadata = (metadata: any): string => {
+  if (!metadata || Object.keys(metadata).length === 0) {
+    return '';
+  }
+  
+  const lines: string[] = [];
+  
+  // Skip certain keys that contain large/binary data
+  const skipKeys = ['zipFile', 'content', 'buffer', 'data', 'blob', 'base64', 'files'];
+  
+  Object.entries(metadata).forEach(([key, value]) => {
+    // Skip large binary data fields
+    if (skipKeys.some(skip => key.toLowerCase().includes(skip))) {
+      return;
+    }
+    
+    const formattedKey = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+    
+    if (typeof value === 'boolean') {
+      lines.push(`${formattedKey}: ${value ? 'Yes' : 'No'}`);
+    } else if (typeof value === 'number') {
+      // Format numbers nicely
+      if (key.toLowerCase().includes('size') || key.toLowerCase().includes('byte')) {
+        const sizeMB = value / (1024 * 1024);
+        if (sizeMB >= 1) {
+          lines.push(`${formattedKey}: ${sizeMB.toFixed(2)} MB`);
+        } else {
+          const sizeKB = value / 1024;
+          lines.push(`${formattedKey}: ${sizeKB.toFixed(2)} KB`);
+        }
+      } else if (key.toLowerCase().includes('speed')) {
+        lines.push(`${formattedKey}: ${value.toFixed(2)} Mbps`);
+      } else if (key.toLowerCase().includes('latency') || key.toLowerCase().includes('duration')) {
+        lines.push(`${formattedKey}: ${value.toFixed(0)} ms`);
+      } else {
+        lines.push(`${formattedKey}: ${value.toFixed ? value.toFixed(2) : value}`);
+      }
+    } else if (typeof value === 'string' && value.length < 50) {
+      lines.push(`${formattedKey}: ${value}`);
+    } else if (Array.isArray(value) && value.length > 0 && value.length <= 5) {
+      lines.push(`${formattedKey}: ${value.join(', ')}`);
+    }
+  });
+  
+  return lines.length > 0 ? lines.join(' | ') : '';
+};
+
 // Helper function to format details object
 const formatDetails = (details: any): string => {
   if (!details || Object.keys(details).length === 0) {
@@ -246,25 +307,59 @@ const formatDetails = (details: any): string => {
   
   const lines: string[] = [];
   
+  // Skip certain keys that contain large/binary data
+  const skipKeys = ['zipFile', 'content', 'buffer', 'data', 'blob', 'base64'];
+  
   Object.entries(details).forEach(([key, value]) => {
+    // Skip large binary data fields
+    if (skipKeys.some(skip => key.toLowerCase().includes(skip))) {
+      return;
+    }
+    
     const formattedKey = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
     
     if (typeof value === 'boolean') {
       lines.push(`${formattedKey}: ${value ? 'Yes' : 'No'}`);
     } else if (typeof value === 'number') {
-      lines.push(`${formattedKey}: ${value}`);
+      // Format numbers nicely
+      if (key.toLowerCase().includes('size') || key.toLowerCase().includes('byte')) {
+        const sizeMB = value / (1024 * 1024);
+        if (sizeMB >= 1) {
+          lines.push(`${formattedKey}: ${sizeMB.toFixed(2)} MB`);
+        } else {
+          const sizeKB = value / 1024;
+          lines.push(`${formattedKey}: ${sizeKB.toFixed(2)} KB`);
+        }
+      } else if (key.toLowerCase().includes('speed') && key.toLowerCase().includes('mbps')) {
+        lines.push(`${formattedKey}: ${value.toFixed(2)} Mbps`);
+      } else {
+        lines.push(`${formattedKey}: ${value.toFixed ? value.toFixed(2) : value}`);
+      }
     } else if (typeof value === 'string') {
-      lines.push(`${formattedKey}: ${value}`);
+      // Truncate very long strings
+      const maxLength = 100;
+      if (value.length > maxLength) {
+        lines.push(`${formattedKey}: ${value.substring(0, maxLength)}...`);
+      } else {
+        lines.push(`${formattedKey}: ${value}`);
+      }
     } else if (Array.isArray(value)) {
       if (value.length > 0 && typeof value[0] === 'object') {
         lines.push(`${formattedKey}: ${value.length} items`);
-      } else {
-        lines.push(`${formattedKey}: ${value.join(', ')}`);
+      } else if (value.length > 0) {
+        // Show first few items
+        const displayItems = value.slice(0, 3);
+        const remaining = value.length - 3;
+        lines.push(`${formattedKey}: ${displayItems.join(', ')}${remaining > 0 ? ` (+${remaining} more)` : ''}`);
       }
-    } else if (typeof value === 'object') {
-      lines.push(`${formattedKey}: ${JSON.stringify(value)}`);
+    } else if (typeof value === 'object' && value !== null) {
+      // For objects, show a summary instead of full JSON
+      const objKeys = Object.keys(value);
+      if (objKeys.length > 0) {
+        lines.push(`${formattedKey}: ${objKeys.length} properties`);
+      }
     }
   });
   
-  return lines.join('\n');
+  return lines.length > 0 ? lines.join('\n') : 'Test completed successfully.';
 };
