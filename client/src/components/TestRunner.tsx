@@ -451,35 +451,69 @@ const TestRunner: React.FC = () => {
 
         {waitingForEmailVerification && (
           <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-6 mb-6">
-            <h3 className="font-bold text-yellow-900 mb-3">Email Verification Required</h3>
+            <h3 className="font-bold text-yellow-900 mb-3">📧 Email Verification Required</h3>
             <p className="text-yellow-800 mb-4">
               Check your email ({userEmail}) and enter the 6-digit code below:
             </p>
-            <input
-              type="text"
-              value={emailCode}
-              onChange={(e) => setEmailCode(e.target.value)}
-              placeholder="000000"
-              maxLength={6}
-              className="w-full md:w-64 px-4 py-2 border-2 border-yellow-400 rounded-lg focus:border-yellow-600 focus:outline-none text-lg text-center font-mono"
-            />
+            <div className="flex flex-col md:flex-row gap-3">
+              <input
+                type="text"
+                value={emailCode}
+                onChange={(e) => setEmailCode(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && emailCode.length === 6 && setEmailCode(emailCode)}
+                placeholder="000000"
+                maxLength={6}
+                className="flex-1 md:w-64 px-4 py-2 border-2 border-yellow-400 rounded-lg focus:border-yellow-600 focus:outline-none text-lg text-center font-mono"
+              />
+              <button
+                onClick={() => emailCode.length === 6 && setEmailCode(emailCode)}
+                disabled={emailCode.length !== 6}
+                className={`px-6 py-2 rounded-lg font-semibold transition-colors ${
+                  emailCode.length === 6
+                    ? 'bg-yellow-500 text-white hover:bg-yellow-600 cursor-pointer'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                Verify Code
+              </button>
+            </div>
+            <p className="text-sm text-yellow-700 mt-2">
+              💡 Enter the 6-digit code from your email and click "Verify Code"
+            </p>
           </div>
         )}
 
         {waitingFor2FAVerification && (
           <div className="bg-blue-50 border-2 border-blue-400 rounded-lg p-6 mb-6">
-            <h3 className="font-bold text-blue-900 mb-3">2FA Code Required</h3>
+            <h3 className="font-bold text-blue-900 mb-3">🔐 2FA Code Required</h3>
             <p className="text-blue-800 mb-4">
               Check your email ({userEmail}) and enter the 6-digit 2FA code below:
             </p>
-            <input
-              type="text"
-              value={tfaCode}
-              onChange={(e) => setTfaCode(e.target.value)}
-              placeholder="000000"
-              maxLength={6}
-              className="w-full md:w-64 px-4 py-2 border-2 border-blue-400 rounded-lg focus:border-blue-600 focus:outline-none text-lg text-center font-mono"
-            />
+            <div className="flex flex-col md:flex-row gap-3">
+              <input
+                type="text"
+                value={tfaCode}
+                onChange={(e) => setTfaCode(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && tfaCode.length === 6 && setTfaCode(tfaCode)}
+                placeholder="000000"
+                maxLength={6}
+                className="flex-1 md:w-64 px-4 py-2 border-2 border-blue-400 rounded-lg focus:border-blue-600 focus:outline-none text-lg text-center font-mono"
+              />
+              <button
+                onClick={() => tfaCode.length === 6 && setTfaCode(tfaCode)}
+                disabled={tfaCode.length !== 6}
+                className={`px-6 py-2 rounded-lg font-semibold transition-colors ${
+                  tfaCode.length === 6
+                    ? 'bg-blue-500 text-white hover:bg-blue-600 cursor-pointer'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                Verify Code
+              </button>
+            </div>
+            <p className="text-sm text-blue-700 mt-2">
+              💡 Enter the 6-digit code from your email and click "Verify Code"
+            </p>
           </div>
         )}
 
