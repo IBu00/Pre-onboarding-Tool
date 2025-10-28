@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { TestResult, TestType } from '../types/test.types';
-import { TESTS, TestConfig } from '../config/testConfig';
+import { TESTS } from '../config/testConfig';
 import testService from '../services/testService';
 import { apiService } from '../services/apiService';
 import TestCard from './TestCard';
@@ -18,11 +18,8 @@ const TestRunner: React.FC = () => {
   const [showEmailInput, setShowEmailInput] = useState(false);
   const [emailCode, setEmailCode] = useState('');
   const [tfaCode, setTfaCode] = useState('');
-  const [emailSent, setEmailSent] = useState(false);
-  const [tfaSent, setTfaSent] = useState(false);
   const [waitingForEmailVerification, setWaitingForEmailVerification] = useState(false);
   const [waitingFor2FAVerification, setWaitingFor2FAVerification] = useState(false);
-  const [uploadFiles, setUploadFiles] = useState<FileList | null>(null);
 
   const startTests = async () => {
     if (!userEmail || !userEmail.includes('@')) {
@@ -88,7 +85,6 @@ const TestRunner: React.FC = () => {
     try {
       // Send test email
       await apiService.sendTestEmail(userEmail);
-      setEmailSent(true);
       setWaitingForEmailVerification(true);
       
       // Wait for user to enter code (with timeout)
@@ -168,7 +164,6 @@ const TestRunner: React.FC = () => {
     try {
       // Send 2FA code
       await apiService.send2FACode(userEmail);
-      setTfaSent(true);
       setWaitingFor2FAVerification(true);
       
       // Wait for user to enter code
