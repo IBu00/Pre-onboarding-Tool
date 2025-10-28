@@ -108,8 +108,7 @@ exports.handler = async (event, context) => {
       const fileInfo = {
         filename: file.originalname,
         size: file.size,
-        mimetype: file.mimetype,
-        uploadedAt: new Date().toISOString()
+        mimetype: file.mimetype
       };
 
       // Check file size
@@ -120,19 +119,18 @@ exports.handler = async (event, context) => {
       uploadedFiles.push(fileInfo);
     }
 
-    // Return success response with warnings if any
+    // Return minimal response to avoid 6MB payload limit
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
         success: true,
         message: warnings.length > 0 ? 'Upload successful with warnings' : 'Upload test successful',
-        details: `${uploadedFiles.length} file(s) uploaded successfully. ${warnings.length > 0 ? 'Some warnings were detected but files were uploaded.' : 'All files uploaded without issues.'}`,
+        details: `${uploadedFiles.length} file(s) uploaded successfully. ${warnings.length > 0 ? 'Some warnings were detected.' : 'All files uploaded without issues.'}`,
         uploadedFiles: uploadedFiles.map(f => f.filename),
         warnings: warnings.length > 0 ? warnings : undefined,
         metadata: {
           filesUploaded: uploadedFiles.length,
-          files: uploadedFiles,
           totalSize: uploadedFiles.reduce((sum, f) => sum + f.size, 0)
         }
       })

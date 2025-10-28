@@ -61,11 +61,16 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ results, onRestart }) =
                 🎉 Congratulations! Your environment is fully compatible with the ILex platform.
               </p>
             )}
+            {failCount === 0 && warnCount > 0 && (
+              <p className="text-lg mt-2">
+                ✓ Your environment meets the minimum requirements. Some optimizations are recommended but not required.
+              </p>
+            )}
           </div>
 
           {/* Action Buttons */}
           <div className="flex flex-col md:flex-row gap-4">
-            {failCount === 0 && warnCount === 0 && (
+            {failCount === 0 && (
               <button
                 onClick={() => window.open('https://www.institutionallendingexchange.com/', '_blank')}
                 className="flex-1 bg-green-600 hover:bg-green-700 text-white text-lg font-semibold py-4 px-8 rounded-lg shadow-lg transition-all duration-200 transform hover:scale-105"

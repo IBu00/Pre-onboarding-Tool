@@ -348,18 +348,19 @@ class TestService {
       const duration = (Date.now() - startTime) / 1000;
       
       // Determine status
-      // Good: Download > 5 Mbps, Upload > 2 Mbps, Latency < 200ms
-      // Acceptable: Download > 2 Mbps, Upload > 1 Mbps, Latency < 500ms
+      // Adjusted thresholds for international users (e.g., Singapore to US)
+      // Good: Download > 5 Mbps, Upload > 2 Mbps, Latency < 500ms
+      // Acceptable: Download > 2 Mbps, Upload > 1 Mbps, Latency < 1000ms
       // Slow: Anything below acceptable
       
       let status: 'PASS' | 'WARNING' | 'FAIL';
       let message: string;
       const blockers: string[] = [];
       
-      if (downloadSpeedMbps >= 5 && uploadSpeedMbps >= 2 && latency < 200) {
+      if (downloadSpeedMbps >= 5 && uploadSpeedMbps >= 2 && latency < 500) {
         status = 'PASS';
         message = 'Connection speed is excellent';
-      } else if (downloadSpeedMbps >= 2 && uploadSpeedMbps >= 1 && latency < 500) {
+      } else if (downloadSpeedMbps >= 2 && uploadSpeedMbps >= 1 && latency < 1000) {
         status = 'WARNING';
         message = 'Connection speed is acceptable but could be improved';
       } else {
@@ -367,7 +368,7 @@ class TestService {
         message = 'Connection speed is below recommended minimum';
         if (downloadSpeedMbps < 2) blockers.push('Download speed too slow (minimum 2 Mbps required)');
         if (uploadSpeedMbps < 1) blockers.push('Upload speed too slow (minimum 1 Mbps required)');
-        if (latency >= 500) blockers.push('Network latency too high (maximum 500ms acceptable)');
+        if (latency >= 1000) blockers.push('Network latency too high (maximum 1000ms acceptable)');
       }
       
       return this.createResult(
