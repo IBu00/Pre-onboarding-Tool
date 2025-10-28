@@ -373,43 +373,63 @@ const TestRunner: React.FC = () => {
 
   if (!showEmailInput && !isRunning) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
-        <div className="max-w-3xl w-full bg-white rounded-2xl shadow-2xl p-8 md:p-12">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="max-w-3xl w-full bg-white rounded-lg shadow-lg p-8 md:p-12 border border-gray-200">
           <div className="text-center">
-            <h1 className="text-4xl md:text-5xl font-bold text-gray-800 mb-4">
-              ILex Pre-Onboarding Test
-            </h1>
-            <p className="text-xl text-gray-600 mb-8">
-              Institutional Lending Exchange
-            </p>
-            <div className="w-32 h-1 bg-primary mx-auto mb-8"></div>
+            <div className="mb-6">
+              <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
+                iLex Pre-Onboarding System Test
+              </h1>
+              <p className="text-lg text-gray-600">
+                Institutional Lending Exchange
+              </p>
+            </div>
+            <div className="w-24 h-1 bg-primary mx-auto mb-8"></div>
             
-            <p className="text-lg text-gray-700 mb-6">
-              This application will test your environment's compatibility with the ILex platform
-              by running 7 critical security and connectivity tests.
+            <p className="text-base text-gray-700 mb-8 leading-relaxed">
+              This diagnostic tool will verify your environment's compatibility with the iLex platform
+              by performing 7 essential security and connectivity tests.
             </p>
             
-            <div className="bg-blue-50 border-l-4 border-blue-500 p-6 mb-8 text-left">
-              <h3 className="font-bold text-blue-900 mb-2">What we'll test:</h3>
-              <ul className="space-y-2 text-blue-800">
-                <li>✓ Domain accessibility</li>
-                <li>✓ Email delivery and 2FA timing</li>
-                <li>✓ File upload and download capabilities</li>
-                <li>✓ Intercom widget compatibility</li>
-                <li>✓ Screen resolution</li>
-                <li>✓ Connection speed</li>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 mb-8 text-left">
+              <h3 className="font-semibold text-gray-900 mb-4">Test Coverage:</h3>
+              <ul className="space-y-2 text-gray-700 text-sm">
+                <li className="flex items-start">
+                  <span className="text-primary mr-2">•</span>
+                  <span>Domain accessibility</span>
+                </li>
+                <li className="flex items-start">
+                  <span className="text-primary mr-2">•</span>
+                  <span>Email delivery and 2FA timing</span>
+                </li>
+                <li className="flex items-start">
+                  <span className="text-primary mr-2">•</span>
+                  <span>File upload and download capabilities</span>
+                </li>
+                <li className="flex items-start">
+                  <span className="text-primary mr-2">•</span>
+                  <span>Intercom widget compatibility</span>
+                </li>
+                <li className="flex items-start">
+                  <span className="text-primary mr-2">•</span>
+                  <span>Screen resolution</span>
+                </li>
+                <li className="flex items-start">
+                  <span className="text-primary mr-2">•</span>
+                  <span>Connection speed</span>
+                </li>
               </ul>
             </div>
             
-            <p className="text-gray-600 mb-8">
-              <span className="font-semibold">Estimated time:</span> 5-10 minutes
+            <p className="text-sm text-gray-600 mb-8">
+              <span className="font-semibold">Estimated Duration:</span> 5-10 minutes
             </p>
             
             <button
               onClick={() => setShowEmailInput(true)}
-              className="bg-primary hover:bg-primary-dark text-white text-xl font-semibold py-4 px-12 rounded-lg shadow-lg transition-all duration-200 transform hover:scale-105"
+              className="bg-primary hover:bg-primary-dark text-white text-lg font-semibold py-3 px-10 rounded transition-colors duration-200"
             >
-              Start Test
+              Begin Testing
             </button>
           </div>
         </div>
@@ -419,13 +439,13 @@ const TestRunner: React.FC = () => {
 
   if (showEmailInput && !isRunning) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
-        <div className="max-w-2xl w-full bg-white rounded-2xl shadow-2xl p-8">
-          <h2 className="text-3xl font-bold text-gray-800 mb-6 text-center">
-            Enter Your Email
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="max-w-2xl w-full bg-white rounded-lg shadow-lg p-8 border border-gray-200">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4 text-center">
+            Enter Your Email Address
           </h2>
           <p className="text-gray-600 mb-6 text-center">
-            We'll use this email to test email delivery and 2FA timing.
+            Required for email delivery and 2FA timing tests
           </p>
           
           <div className="space-y-4">
@@ -434,22 +454,22 @@ const TestRunner: React.FC = () => {
               value={userEmail}
               onChange={(e) => setUserEmail(e.target.value)}
               placeholder="your.email@company.com"
-              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-primary focus:outline-none text-lg"
+              className="w-full px-4 py-3 border border-gray-300 rounded focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
             
             <div className="flex space-x-4">
               <button
                 onClick={() => setShowEmailInput(false)}
-                className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-3 px-6 rounded-lg transition-colors"
+                className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-3 px-6 rounded transition-colors"
               >
                 Back
               </button>
               <button
                 onClick={startTests}
                 disabled={!userEmail || !userEmail.includes('@')}
-                className="flex-1 bg-primary hover:bg-primary-dark text-white font-semibold py-3 px-6 rounded-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                className="flex-1 bg-primary hover:bg-primary-dark text-white font-semibold py-3 px-6 rounded transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
               >
-                Begin Tests
+                Continue
               </button>
             </div>
           </div>
@@ -459,14 +479,14 @@ const TestRunner: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
+    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
       <div className="max-w-5xl mx-auto">
-        <div className="bg-white rounded-2xl shadow-2xl p-6 md:p-8 mb-6">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-2">
-            Running Tests...
+        <div className="bg-white rounded-lg shadow-lg p-6 md:p-8 mb-6 border border-gray-200">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
+            Running System Tests
           </h1>
           <p className="text-gray-600 mb-6">
-            Please wait while we test your environment
+            Please wait while we verify your environment compatibility
           </p>
           
           <ProgressBar 
@@ -483,9 +503,9 @@ const TestRunner: React.FC = () => {
             // Test 2: Email Delivery & 2FA - show verification UI
             if (index === 1 && waitingFor2FAVerification) {
               children = (
-                <div className="bg-blue-50 border-2 border-blue-400 rounded-lg p-4">
-                  <p className="text-blue-800 mb-3 font-semibold">
-                    Check your email ({userEmail}) and enter the 6-digit code:
+                <div className="bg-blue-50 border border-blue-300 rounded p-4">
+                  <p className="text-gray-800 mb-3 font-medium text-sm">
+                    Enter the 6-digit verification code sent to {userEmail}:
                   </p>
                   <div className="flex flex-col md:flex-row gap-3">
                     <input
@@ -495,22 +515,22 @@ const TestRunner: React.FC = () => {
                       onKeyPress={(e) => e.key === 'Enter' && tfaCode.length === 6 && handleTfaVerification()}
                       placeholder="000000"
                       maxLength={6}
-                      className="flex-1 md:w-64 px-4 py-3 border-2 border-blue-400 rounded-lg focus:border-blue-600 focus:outline-none text-xl text-center font-mono tracking-widest"
+                      className="flex-1 md:w-64 px-4 py-3 border border-gray-300 rounded focus:border-primary focus:outline-none text-lg text-center font-mono tracking-widest"
                     />
                     <button
                       onClick={handleTfaVerification}
                       disabled={tfaCode.length !== 6}
-                      className={`px-8 py-3 rounded-lg font-semibold transition-colors text-lg ${
+                      className={`px-8 py-3 rounded font-semibold transition-colors ${
                         tfaCode.length === 6
-                          ? 'bg-blue-500 text-white hover:bg-blue-600 cursor-pointer shadow-md'
-                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          ? 'bg-primary text-white hover:bg-primary-dark cursor-pointer'
+                          : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                       }`}
                     >
-                      Verify Code
+                      Verify
                     </button>
                   </div>
-                  <p className="text-sm text-blue-700 mt-2">
-                    💡 Enter the code and click "Verify Code" or press Enter
+                  <p className="text-xs text-gray-600 mt-2">
+                    Press Enter or click Verify to submit
                   </p>
                 </div>
               );
@@ -519,18 +539,18 @@ const TestRunner: React.FC = () => {
             // Test 3: File Download - show download button
             if (index === 2 && showDownloadButton) {
               children = (
-                <div className="bg-green-50 border-2 border-green-400 rounded-lg p-4">
-                  <p className="text-green-800 mb-3 font-semibold">
-                    Click the button below to download VDR test files as a ZIP archive:
+                <div className="bg-green-50 border border-green-300 rounded p-4">
+                  <p className="text-gray-800 mb-3 font-medium text-sm">
+                    Download VDR test files (ZIP archive):
                   </p>
                   <button
                     onClick={handleDownloadFiles}
-                    className="w-full px-8 py-4 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 transition-colors text-lg shadow-md"
+                    className="w-full px-6 py-3 bg-green-600 text-white rounded font-semibold hover:bg-green-700 transition-colors"
                   >
-                    📥 Download VDR Test Files (ZIP)
+                    Download Test Files
                   </button>
-                  <p className="text-sm text-green-700 mt-2">
-                    💡 This will download a ZIP file containing all VDR test files. Extract the ZIP and use these files for the upload test.
+                  <p className="text-xs text-gray-600 mt-2">
+                    Files will be used for the upload test. Extract the ZIP after downloading.
                   </p>
                 </div>
               );
@@ -539,9 +559,9 @@ const TestRunner: React.FC = () => {
             // Test 4: File Upload - show upload button
             if (index === 3 && showUploadButton) {
               children = (
-                <div className="bg-orange-50 border-2 border-orange-400 rounded-lg p-4">
-                  <p className="text-orange-800 mb-3 font-semibold">
-                    Select files to test upload:
+                <div className="bg-orange-50 border border-orange-300 rounded p-4">
+                  <p className="text-gray-800 mb-3 font-medium text-sm">
+                    Select files to upload:
                   </p>
                   <input
                     type="file"
@@ -553,15 +573,12 @@ const TestRunner: React.FC = () => {
                   />
                   <label
                     htmlFor="upload-test-input"
-                    className="block w-full px-8 py-4 bg-orange-500 text-white rounded-lg font-semibold hover:bg-orange-600 transition-colors text-lg shadow-md text-center cursor-pointer"
+                    className="block w-full px-6 py-3 bg-orange-600 text-white rounded font-semibold hover:bg-orange-700 transition-colors text-center cursor-pointer"
                   >
-                    📤 Upload Test Files
+                    Select Files to Upload
                   </label>
-                  <p className="text-sm text-orange-700 mt-2">
-                    💡 Upload the files you downloaded from the ZIP. You can also upload any other files to test various file types and sizes.
-                  </p>
-                  <p className="text-sm text-orange-700 mt-2">
-                    💡 You can upload the files you just downloaded or any other files
+                  <p className="text-xs text-gray-600 mt-2">
+                    Upload the previously downloaded test files or any other files.
                   </p>
                 </div>
               );
