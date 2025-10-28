@@ -9,6 +9,10 @@ const parseMultipartForm = (event) => {
       headers: {
         ...event.headers,
         'content-type': event.headers['content-type'] || event.headers['Content-Type']
+      },
+      limits: {
+        fileSize: 100 * 1024 * 1024, // 100MB per file
+        files: 100 // Maximum 100 files
       }
     });
 
@@ -74,17 +78,15 @@ exports.handler = async (event, context) => {
         body: JSON.stringify({
           success: false,
           message: 'No files uploaded',
-          details: 'File upload test requires files to be selected and uploaded. Please choose the files you downloaded earlier and try again.',
+          details: 'File upload test requires files to be selected and uploaded.',
           blockers: ['No files selected', 'Upload request incomplete']
         })
       };
     }
 
     const uploadedFiles = [];
-    const blockers = [];
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    const allowedTypes = ['text/plain', 'image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
-    let allFilesValid = true;
+    const warnings = [];
+    const maxSize = 100 * 1024 * 1024; // 100MB
 
     for (const file of files) {
       const fileInfo = {
@@ -96,71 +98,22 @@ exports.handler = async (event, context) => {
 
       // Check file size
       if (file.size > maxSize) {
-        blockers.push(`File "${file.originalname}": Size (${(file.size / 1024 / 1024).toFixed(2)}MB) exceeds recommended limit of 10MB`);
-        allFilesValid = false;
-      }
-
-      // Check file type - be lenient for test files
-      if (!allowedTypes.includes(file.mimetype) && !file.mimetype.includes('text')) {
-        blockers.push(`File "${file.originalname}": Type '${file.mimetype}' may not be supported by all platform features`);
-      }
-
-      // Check if file is empty
-      if (file.size === 0) {
-        blockers.push(`File "${file.originalname}": File is empty`);
-        allFilesValid = false;
+        warnings.push(`File "${file.originalname}": Size (${(file.size / 1024 / 1024).toFixed(2)}MB) exceeds 100MB limit`);
       }
 
       uploadedFiles.push(fileInfo);
     }
 
-    // Determine success status
-    const success = files.length > 0 && uploadedFiles.length === files.length;
-
-    if (blockers.length > 0 && !allFilesValid) {
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({
-          success: false,
-          message: 'Upload failed with errors',
-          details: `${uploadedFiles.length} file(s) were processed, but critical errors were detected that prevent successful upload.`,
-          blockers,
-          metadata: {
-            filesUploaded: uploadedFiles.length,
-            files: uploadedFiles,
-            totalSize: uploadedFiles.reduce((sum, f) => sum + f.size, 0)
-          }
-        })
-      };
-    }
-
-    if (blockers.length > 0) {
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({
-          success: true,
-          message: 'Upload successful with warnings',
-          details: `${uploadedFiles.length} file(s) uploaded successfully, but some warnings were detected. The files were received by the server, but there are potential compatibility issues that may affect usage.`,
-          blockers,
-          metadata: {
-            filesUploaded: uploadedFiles.length,
-            files: uploadedFiles,
-            totalSize: uploadedFiles.reduce((sum, f) => sum + f.size, 0)
-          }
-        })
-      };
-    }
-
+    // Return success response with warnings if any
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
         success: true,
-        message: 'Upload test successful',
-        details: `File upload test passed successfully! ${uploadedFiles.length} file(s) uploaded without any issues. Your network and browser configuration properly support file uploads to the platform. All files meet the platform requirements.`,
-        blockers: [],
+        message: warnings.length > 0 ? 'Upload successful with warnings' : 'Upload test successful',
+        details: `${uploadedFiles.length} file(s) uploaded successfully. ${warnings.length > 0 ? 'Some warnings were detected but files were uploaded.' : 'All files uploaded without issues.'}`,
+        uploadedFiles: uploadedFiles.map(f => f.filename),
+        warnings: warnings.length > 0 ? warnings : undefined,
         metadata: {
           filesUploaded: uploadedFiles.length,
           files: uploadedFiles,
@@ -176,12 +129,11 @@ exports.handler = async (event, context) => {
       body: JSON.stringify({
         success: false,
         message: 'Upload test failed',
-        details: 'Failed to upload files to the server. This could be due to network issues, server restrictions, or file handling problems.',
+        details: `Failed to upload files to the server. Error: ${error.message}`,
         blockers: [
           'Network interruption during upload',
           'Server rejected the files',
-          'File processing error',
-          'Antivirus or security software blocking upload'
+          'File processing error'
         ],
         metadata: { error: error.message }
       })

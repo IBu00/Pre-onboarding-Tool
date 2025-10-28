@@ -92,6 +92,8 @@ class TestService {
   }
 
   async runFileUploadTest(files: FileList | File[]): Promise<TestResult> {
+    const startTime = Date.now();
+    
     try {
       if (!files || files.length === 0) {
         return this.createResult(
@@ -99,37 +101,87 @@ class TestService {
           'File Upload Test',
           'FAIL',
           'No files selected',
-          'Please select the files you downloaded earlier to upload them back to the platform.',
+          'Please select files to upload.',
           ['No files selected'],
           undefined
         );
       }
 
       const filesArray = Array.isArray(files) ? files : Array.from(files);
+      
+      // Validate file count (max 100 files)
+      if (filesArray.length > 100) {
+        throw new Error(`Too many files selected. Maximum 100 files allowed, you selected ${filesArray.length} files.`);
+      }
+
+      // Validate file sizes (max 100MB per file)
+      const maxFileSize = 100 * 1024 * 1024; // 100MB in bytes
+      const oversizedFiles: string[] = [];
+      
+      for (let i = 0; i < filesArray.length; i++) {
+        const file = filesArray[i];
+        if (file.size > maxFileSize) {
+          oversizedFiles.push(`${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB)`);
+        }
+      }
+      
+      if (oversizedFiles.length > 0) {
+        throw new Error(`Files exceed 100MB limit: ${oversizedFiles.join(', ')}`);
+      }
+      
+      // Upload files
       const response = await apiService.uploadFiles(filesArray);
       
-      const status = response.success 
-        ? (response.blockers && response.blockers.length > 0 ? 'WARNING' : 'PASS')
-        : 'FAIL';
+      if (!response.success) {
+        throw new Error(response.message || 'Upload failed');
+      }
+      
+      const duration = (Date.now() - startTime) / 1000;
+      const uploadedCount = response.uploadedFiles?.length || filesArray.length;
+      const totalSize = filesArray.reduce((sum, file) => sum + file.size, 0);
+      const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(2);
+      
+      // Check for any warnings from the server and clean up file paths
+      const warnings = response.warnings || [];
+      const cleanedWarnings = warnings.map((w: string) => {
+        // Clean up file paths to show only file names
+        return w.replace(/File ".*[\/\\]([^\/\\]+)"/g, 'File "$1"');
+      });
+      const hasWarnings = cleanedWarnings.length > 0;
       
       return this.createResult(
         TestType.FILE_UPLOAD,
         'File Upload Test',
-        status,
-        response.message,
-        response.details,
-        response.blockers,
-        response.metadata
+        hasWarnings ? 'WARNING' : 'PASS',
+        hasWarnings 
+          ? `${uploadedCount} file(s) uploaded successfully with some warnings` 
+          : `${uploadedCount} file(s) uploaded successfully`,
+        `Successfully uploaded ${uploadedCount} file(s) (${totalSizeMB} MB total) in ${duration.toFixed(2)} seconds. ${hasWarnings ? 'Some warnings were detected but files were uploaded.' : 'All files uploaded without issues.'}`,
+        hasWarnings ? cleanedWarnings : undefined,
+        {
+          fileCount: uploadedCount,
+          totalSize: parseFloat(totalSizeMB),
+          duration: parseFloat(duration.toFixed(2)),
+          uploadSpeed: parseFloat((parseFloat(totalSizeMB) / duration).toFixed(2))
+        }
       );
     } catch (error) {
+      const duration = (Date.now() - startTime) / 1000;
+      
       return this.createResult(
         TestType.FILE_UPLOAD,
         'File Upload Test',
         'FAIL',
-        'Upload test failed',
-        'Unable to upload files to the server. This indicates network issues or upload restrictions.',
-        ['Upload blocked', 'Server rejected files', 'Network timeout'],
-        { error: error instanceof Error ? error.message : 'Unknown error' }
+        'File upload failed',
+        error instanceof Error ? error.message : 'Unknown error occurred during upload',
+        [
+          'File upload failed',
+          error instanceof Error ? error.message : 'Unknown error'
+        ],
+        {
+          duration: parseFloat(duration.toFixed(2)),
+          error: error instanceof Error ? error.message : 'Unknown error'
+        }
       );
     }
   }
@@ -218,53 +270,106 @@ class TestService {
   }
 
   async runConnectionSpeedTest(): Promise<TestResult> {
+    const startTime = Date.now();
+    
     try {
-      // Latency test using ping
-      const latencyResult = await apiService.pingTest();
-      const latency = latencyResult.latency;
-
-      // Simple connection quality classification based on latency
-      // We don't measure actual download/upload speeds as that requires dedicated endpoints
-      const maxLatency = 200; // ms
-      const goodLatency = 100; // ms
-
+      // Test 1: Measure download speed using file download
+      const downloadStart = Date.now();
+      const downloadResponse = await apiService.testFileDownload();
+      const downloadTime = (Date.now() - downloadStart) / 1000;
+      
+      // Calculate download speed (test files are ~150KB total)
+      const downloadSizeKB = 150;
+      const downloadSpeedKbps = (downloadSizeKB * 8) / downloadTime; // Convert to Kbps
+      const downloadSpeedMbps = downloadSpeedKbps / 1000;
+      
+      // Test 2: Measure upload speed
+      const testData = new Blob([new ArrayBuffer(500 * 1024)]); // 500KB test file
+      const testFile = new File([testData], 'speed-test.bin');
+      
+      const uploadStart = Date.now();
+      await apiService.uploadFiles([testFile]);
+      const uploadTime = (Date.now() - uploadStart) / 1000;
+      
+      const uploadSizeKB = 500;
+      const uploadSpeedKbps = (uploadSizeKB * 8) / uploadTime;
+      const uploadSpeedMbps = uploadSpeedKbps / 1000;
+      
+      // Test 3: Check latency with ping
+      const pingStart = Date.now();
+      await apiService.pingTest();
+      const latency = Date.now() - pingStart;
+      
+      const duration = (Date.now() - startTime) / 1000;
+      
+      // Determine status
+      // Good: Download > 10 Mbps, Upload > 5 Mbps, Latency < 100ms
+      // Acceptable: Download > 5 Mbps, Upload > 2 Mbps, Latency < 200ms
+      // Slow: Anything below acceptable
+      
       let status: 'PASS' | 'WARNING' | 'FAIL';
       let message: string;
-      const blockers: string[] = [];
-
-      if (latency <= goodLatency) {
+      let recommendations: string[] = [];
+      
+      if (downloadSpeedMbps >= 10 && uploadSpeedMbps >= 5 && latency < 100) {
         status = 'PASS';
-        message = 'Connection speed is good';
-      } else if (latency <= maxLatency) {
+        message = 'Connection speed is excellent';
+      } else if (downloadSpeedMbps >= 5 && uploadSpeedMbps >= 2 && latency < 200) {
         status = 'WARNING';
-        message = 'Connection speed is acceptable but could be better';
-        blockers.push('Higher latency may affect real-time interactions');
+        message = 'Connection speed is acceptable but could be improved';
+        recommendations = [
+          'Connection speed is functional but may cause delays with large files',
+          'Consider upgrading internet connection for better performance',
+          'Close bandwidth-heavy applications during platform use'
+        ];
       } else {
         status = 'FAIL';
-        message = 'Connection speed is below recommended levels';
-        blockers.push('High latency will affect file transfers and real-time interactions');
+        message = 'Connection speed is below recommended minimum';
+        recommendations = [
+          'Internet connection speed is insufficient for optimal performance',
+          'Large file transfers will be significantly delayed',
+          'Video calls and real-time features may not work properly',
+          'Contact IT department to investigate network issues'
+        ];
       }
       
-      const details = `Network Latency: ${latency} ms. ${status === 'PASS' ? 'Your connection is fast and stable.' : status === 'WARNING' ? 'Your connection is usable but may experience occasional delays.' : 'Your connection is slow and may cause issues.'}`;
-
+      const blockers: string[] = [];
+      if (downloadSpeedMbps < 5) blockers.push('Download speed too slow (minimum 5 Mbps required)');
+      if (uploadSpeedMbps < 2) blockers.push('Upload speed too slow (minimum 2 Mbps required)');
+      if (latency >= 200) blockers.push('Network latency too high (maximum 200ms acceptable)');
+      
       return this.createResult(
         TestType.CONNECTION_SPEED,
         'Connection Speed Test',
         status,
         message,
-        details,
+        `Download: ${downloadSpeedMbps.toFixed(2)} Mbps | Upload: ${uploadSpeedMbps.toFixed(2)} Mbps | Latency: ${latency} ms. ${status === 'PASS' ? 'Your connection provides sufficient speed for all platform features.' : status === 'WARNING' ? 'Your connection is adequate for basic usage but may experience delays.' : 'Your connection speed may cause performance issues.'}`,
         blockers.length > 0 ? blockers : undefined,
-        { latency, maxLatency, goodLatency }
+        {
+          downloadSpeed: parseFloat(downloadSpeedMbps.toFixed(2)),
+          uploadSpeed: parseFloat(uploadSpeedMbps.toFixed(2)),
+          latency: latency,
+          duration: parseFloat(duration.toFixed(2))
+        }
       );
     } catch (error) {
+      const duration = (Date.now() - startTime) / 1000;
+      
       return this.createResult(
         TestType.CONNECTION_SPEED,
         'Connection Speed Test',
         'FAIL',
-        'Speed test failed',
-        `Unable to measure connection speed. Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        ['Network connection test failed', 'Unable to reach server'],
-        { error: error instanceof Error ? error.message : 'Unknown error' }
+        'Connection speed test failed',
+        'Unable to complete speed test. Network connection may be unstable or interrupted.',
+        [
+          'Network connection unstable',
+          'Unable to complete speed test',
+          error instanceof Error ? error.message : 'Unknown error'
+        ],
+        {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          duration: parseFloat(duration.toFixed(2))
+        }
       );
     }
   }

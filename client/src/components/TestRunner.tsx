@@ -207,6 +207,7 @@ const TestRunner: React.FC = () => {
 
   // Function to handle download button click
   const handleDownloadFiles = async () => {
+    const startTime = Date.now();
     setShowDownloadButton(false);
     
     updateTestResult(2, { 
@@ -223,7 +224,8 @@ const TestRunner: React.FC = () => {
     
     try {
       const result = await testService.runFileDownloadTest();
-      updateTestResult(2, result);
+      const duration = (Date.now() - startTime) / 1000;
+      updateTestResult(2, { ...result, duration });
       
       // After successful download, show upload button
       if (result.status === 'PASS') {
@@ -235,20 +237,26 @@ const TestRunner: React.FC = () => {
         downloadCompleteResolveRef.current();
       }
     } catch (error: any) {
+      const duration = (Date.now() - startTime) / 1000;
       updateTestResult(2, {
         id: '3',
         type: TestType.FILE_DOWNLOAD,
         testName: 'File Download Test',
         status: 'FAIL',
-        message: 'Download test failed',
-        details: JSON.stringify({ error: error.message }),
+        message: 'Download failed',
+        details: `Failed to download test files. ${error.message || 'Unknown error'}`,
         timestamp: new Date(),
-        recommendations: ['File download failed. Check network connection.'],
-        duration: 0,
+        recommendations: [
+          'Check internet connection',
+          'Disable browser download restrictions',
+          'Check pop-up blocker settings',
+          'Try a different browser'
+        ],
+        duration,
         error: error.message,
       });
 
-      // Resolve promise even on failure to continue
+      // Resolve promise even on failure
       if (downloadCompleteResolveRef.current) {
         downloadCompleteResolveRef.current();
       }
@@ -284,6 +292,7 @@ const TestRunner: React.FC = () => {
   const handleFileUpload = async (files: FileList) => {
     if (!files || files.length === 0) return;
 
+    const startTime = Date.now();
     setShowUploadButton(false);
 
     updateTestResult(3, {
@@ -300,27 +309,34 @@ const TestRunner: React.FC = () => {
 
     try {
       const result = await testService.runFileUploadTest(files);
-      updateTestResult(3, result);
+      const duration = (Date.now() - startTime) / 1000;
+      updateTestResult(3, { ...result, duration });
 
       // Resolve the promise to continue to next test
       if (uploadCompleteResolveRef.current) {
         uploadCompleteResolveRef.current();
       }
     } catch (error: any) {
+      const duration = (Date.now() - startTime) / 1000;
       updateTestResult(3, {
         id: '4',
         type: TestType.FILE_UPLOAD,
         testName: 'File Upload Test',
         status: 'FAIL',
-        message: 'Upload test failed',
-        details: JSON.stringify({ error: error.message }),
+        message: 'Upload failed',
+        details: `Failed to upload files. ${error.message || 'Unknown error'}`,
         timestamp: new Date(),
-        recommendations: ['File upload failed. Check network connection and file size limits.'],
-        duration: 0,
+        recommendations: [
+          'Check internet connection',
+          'Verify file sizes are within 100MB limit per file',
+          'Ensure you selected the correct files',
+          'Try uploading fewer files at once'
+        ],
+        duration,
         error: error.message,
       });
 
-      // Resolve promise even on failure to continue
+      // Resolve promise even on failure
       if (uploadCompleteResolveRef.current) {
         uploadCompleteResolveRef.current();
       }
@@ -459,40 +475,6 @@ const TestRunner: React.FC = () => {
           />
         </div>
 
-        {waitingFor2FAVerification && (
-          <div className="bg-blue-50 border-2 border-blue-400 rounded-lg p-6 mb-6">
-            <h3 className="font-bold text-blue-900 mb-3">📧 Email Delivery & 2FA Verification</h3>
-            <p className="text-blue-800 mb-4">
-              Check your email ({userEmail}) and enter the 6-digit code below:
-            </p>
-            <div className="flex flex-col md:flex-row gap-3">
-              <input
-                type="text"
-                value={tfaCode}
-                onChange={(e) => setTfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                onKeyPress={(e) => e.key === 'Enter' && tfaCode.length === 6 && handleTfaVerification()}
-                placeholder="000000"
-                maxLength={6}
-                className="flex-1 md:w-64 px-4 py-3 border-2 border-blue-400 rounded-lg focus:border-blue-600 focus:outline-none text-xl text-center font-mono tracking-widest"
-              />
-              <button
-                onClick={handleTfaVerification}
-                disabled={tfaCode.length !== 6}
-                className={`px-8 py-3 rounded-lg font-semibold transition-colors text-lg ${
-                  tfaCode.length === 6
-                    ? 'bg-blue-500 text-white hover:bg-blue-600 cursor-pointer shadow-md'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                }`}
-              >
-                Verify Code
-              </button>
-            </div>
-            <p className="text-sm text-blue-700 mt-3">
-              💡 Enter the 6-digit code from your email and click "Verify Code" or press Enter
-            </p>
-          </div>
-        )}
-
         <div className="space-y-4">
           {TEST_CONFIGS.map((config, index) => {
             // Render custom children for specific tests
@@ -559,12 +541,12 @@ const TestRunner: React.FC = () => {
               children = (
                 <div className="bg-orange-50 border-2 border-orange-400 rounded-lg p-4">
                   <p className="text-orange-800 mb-3 font-semibold">
-                    Select the files you just downloaded to test upload:
+                    Select files to test upload (up to 100 files, max 100MB each):
                   </p>
                   <input
                     type="file"
                     multiple
-                    accept=".docx,.xlsx,.jpg,.jpeg,.txt,.pdf,.zip"
+                    accept="*/*"
                     onChange={(e) => e.target.files && handleFileUpload(e.target.files)}
                     className="hidden"
                     id="upload-test-input"
@@ -576,7 +558,7 @@ const TestRunner: React.FC = () => {
                     📤 Upload Test Files
                   </label>
                   <p className="text-sm text-orange-700 mt-2">
-                    💡 Select all 3 files that were downloaded in the previous test
+                    💡 You can upload the files you just downloaded or any other files
                   </p>
                 </div>
               );
