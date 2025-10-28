@@ -160,7 +160,7 @@ class TestService {
       const warnings = response.warnings || [];
       const cleanedWarnings = warnings.map((w: string) => {
         // Clean up file paths to show only file names
-        return w.replace(/File ".*[\/\\]([^\/\\]+)"/g, 'File "$1"');
+        return w.replace(/File ".*[/\\]([^/\\]+)"/g, 'File "$1"');
       });
       const hasWarnings = cleanedWarnings.length > 0;
       
@@ -290,7 +290,7 @@ class TestService {
     try {
       // Test 1: Measure download speed using file download
       const downloadStart = Date.now();
-      const downloadResponse = await apiService.testFileDownload();
+      await apiService.testFileDownload();
       const downloadTime = (Date.now() - downloadStart) / 1000;
       
       // Calculate download speed (test files are ~150KB total)
@@ -340,12 +340,6 @@ class TestService {
       } else {
         status = 'FAIL';
         message = 'Connection speed is below recommended minimum';
-        recommendations = [
-          'Internet connection speed is insufficient for optimal performance',
-          'Large file transfers will be significantly delayed',
-          'Video calls and real-time features may not work properly',
-          'Contact IT department to investigate network issues'
-        ];
       }
       
       const blockers: string[] = [];
