@@ -26,7 +26,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ results, onRestart }) =
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+    <div className="min-h-screen bg-primary p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="bg-white rounded-lg shadow-lg p-6 md:p-8 mb-6 border border-gray-200">
