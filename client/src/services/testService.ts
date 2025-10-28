@@ -288,27 +288,27 @@ class TestService {
     const startTime = Date.now();
     
     try {
-      // Test 1: Measure download speed using file download
+      // Test 1: Download speed - download the ZIP file (should be several MB)
       const downloadStart = Date.now();
-      await apiService.testFileDownload();
+      const downloadResponse = await apiService.testFileDownload();
       const downloadTime = (Date.now() - downloadStart) / 1000;
       
-      // Calculate download speed (test files are ~150KB total)
-      const downloadSizeKB = 150;
-      const downloadSpeedKbps = (downloadSizeKB * 8) / downloadTime; // Convert to Kbps
-      const downloadSpeedMbps = downloadSpeedKbps / 1000;
+      // Get actual file size from response
+      const downloadSizeMB = downloadResponse.metadata?.zipFile?.size 
+        ? downloadResponse.metadata.zipFile.size / (1024 * 1024) 
+        : 2; // Fallback to 2MB estimate
+      const downloadSpeedMbps = (downloadSizeMB * 8) / downloadTime; // Convert to Mbps
       
-      // Test 2: Measure upload speed
-      const testData = new Blob([new ArrayBuffer(500 * 1024)]); // 500KB test file
+      // Test 2: Upload speed - upload a 1MB test file
+      const testData = new Blob([new ArrayBuffer(1 * 1024 * 1024)]); // 1MB test file
       const testFile = new File([testData], 'speed-test.bin');
       
       const uploadStart = Date.now();
       await apiService.uploadFiles([testFile]);
       const uploadTime = (Date.now() - uploadStart) / 1000;
       
-      const uploadSizeKB = 500;
-      const uploadSpeedKbps = (uploadSizeKB * 8) / uploadTime;
-      const uploadSpeedMbps = uploadSpeedKbps / 1000;
+      const uploadSizeMB = 1;
+      const uploadSpeedMbps = (uploadSizeMB * 8) / uploadTime;
       
       // Test 3: Check latency with ping
       const pingStart = Date.now();
@@ -318,28 +318,27 @@ class TestService {
       const duration = (Date.now() - startTime) / 1000;
       
       // Determine status
-      // Good: Download > 10 Mbps, Upload > 5 Mbps, Latency < 100ms
-      // Acceptable: Download > 5 Mbps, Upload > 2 Mbps, Latency < 200ms
+      // Good: Download > 5 Mbps, Upload > 2 Mbps, Latency < 200ms
+      // Acceptable: Download > 2 Mbps, Upload > 1 Mbps, Latency < 500ms
       // Slow: Anything below acceptable
       
       let status: 'PASS' | 'WARNING' | 'FAIL';
       let message: string;
+      const blockers: string[] = [];
       
-      if (downloadSpeedMbps >= 10 && uploadSpeedMbps >= 5 && latency < 100) {
+      if (downloadSpeedMbps >= 5 && uploadSpeedMbps >= 2 && latency < 200) {
         status = 'PASS';
         message = 'Connection speed is excellent';
-      } else if (downloadSpeedMbps >= 5 && uploadSpeedMbps >= 2 && latency < 200) {
+      } else if (downloadSpeedMbps >= 2 && uploadSpeedMbps >= 1 && latency < 500) {
         status = 'WARNING';
         message = 'Connection speed is acceptable but could be improved';
       } else {
         status = 'FAIL';
         message = 'Connection speed is below recommended minimum';
+        if (downloadSpeedMbps < 2) blockers.push('Download speed too slow (minimum 2 Mbps required)');
+        if (uploadSpeedMbps < 1) blockers.push('Upload speed too slow (minimum 1 Mbps required)');
+        if (latency >= 500) blockers.push('Network latency too high (maximum 500ms acceptable)');
       }
-      
-      const blockers: string[] = [];
-      if (downloadSpeedMbps < 5) blockers.push('Download speed too slow (minimum 5 Mbps required)');
-      if (uploadSpeedMbps < 2) blockers.push('Upload speed too slow (minimum 2 Mbps required)');
-      if (latency >= 200) blockers.push('Network latency too high (maximum 200ms acceptable)');
       
       return this.createResult(
         TestType.CONNECTION_SPEED,

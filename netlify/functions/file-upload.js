@@ -5,51 +5,67 @@ const parseMultipartForm = (event) => {
     const fields = {};
     const files = [];
     
-    const bb = busboy({ 
-      headers: {
-        ...event.headers,
-        'content-type': event.headers['content-type'] || event.headers['Content-Type']
-      },
-      limits: {
-        fileSize: 100 * 1024 * 1024, // 100MB per file
-        files: 100 // Maximum 100 files
-      }
-    });
-
-    bb.on('file', (name, file, info) => {
-      const { filename, encoding, mimeType } = info;
-      const chunks = [];
-      
-      file.on('data', (data) => {
-        chunks.push(data);
+    try {
+      const bb = busboy({ 
+        headers: {
+          ...event.headers,
+          'content-type': event.headers['content-type'] || event.headers['Content-Type']
+        },
+        limits: {
+          fileSize: 100 * 1024 * 1024, // 100MB per file
+          files: 100 // Maximum 100 files
+        }
       });
-      
-      file.on('end', () => {
-        files.push({
-          fieldname: name,
-          originalname: filename,
-          encoding: encoding,
-          mimetype: mimeType,
-          buffer: Buffer.concat(chunks),
-          size: Buffer.concat(chunks).length
+
+      bb.on('file', (name, file, info) => {
+        const { filename, encoding, mimeType } = info;
+        const chunks = [];
+        let fileSize = 0;
+        
+        file.on('data', (data) => {
+          chunks.push(data);
+          fileSize += data.length;
+        });
+        
+        file.on('end', () => {
+          files.push({
+            fieldname: name,
+            originalname: filename,
+            encoding: encoding,
+            mimetype: mimeType,
+            buffer: Buffer.concat(chunks),
+            size: fileSize
+          });
+        });
+        
+        file.on('error', (error) => {
+          console.error('File stream error:', error);
         });
       });
-    });
 
-    bb.on('field', (name, value) => {
-      fields[name] = value;
-    });
+      bb.on('field', (name, value) => {
+        fields[name] = value;
+      });
 
-    bb.on('finish', () => {
-      resolve({ fields, files });
-    });
+      bb.on('finish', () => {
+        resolve({ fields, files });
+      });
 
-    bb.on('error', (error) => {
+      bb.on('error', (error) => {
+        console.error('Busboy error:', error);
+        reject(error);
+      });
+
+      const body = event.isBase64Encoded 
+        ? Buffer.from(event.body, 'base64')
+        : event.body;
+      
+      bb.write(body);
+      bb.end();
+    } catch (error) {
+      console.error('Parse multipart error:', error);
       reject(error);
-    });
-
-    bb.write(event.body, event.isBase64Encoded ? 'base64' : 'binary');
-    bb.end();
+    }
   });
 };
 
@@ -129,11 +145,11 @@ exports.handler = async (event, context) => {
       body: JSON.stringify({
         success: false,
         message: 'Upload test failed',
-        details: `Failed to upload files to the server. Error: ${error.message}`,
+        details: `Failed to upload files. Error: ${error.message}`,
         blockers: [
-          'Network interruption during upload',
-          'Server rejected the files',
-          'File processing error'
+          'File upload processing error',
+          'Server error during upload',
+          error.message
         ],
         metadata: { error: error.message }
       })

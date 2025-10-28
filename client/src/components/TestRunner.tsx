@@ -295,13 +295,14 @@ const TestRunner: React.FC = () => {
     const startTime = Date.now();
     setShowUploadButton(false);
 
+    // Show uploading status
     updateTestResult(3, {
       id: '4',
       type: TestType.FILE_UPLOAD,
       testName: 'File Upload Test',
       status: 'RUNNING',
-      message: 'Uploading files...',
-      details: '',
+      message: `Uploading ${files.length} file(s)...`,
+      details: `Processing ${files.length} file(s). Total size: ${(Array.from(files).reduce((sum, f) => sum + f.size, 0) / 1024 / 1024).toFixed(2)} MB. Please wait...`,
       timestamp: new Date(),
       recommendations: [],
       duration: 0,

@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const archiver = require('archiver');
 
 exports.handler = async (event, context) => {
@@ -11,76 +13,113 @@ exports.handler = async (event, context) => {
     return { statusCode: 200, headers, body: '' };
   }
 
+  if (event.httpMethod !== 'GET') {
+    return {
+      statusCode: 405,
+      headers,
+      body: JSON.stringify({ success: false, message: 'Method not allowed' })
+    };
+  }
+
   try {
-    // Create test files in memory
-    const testFiles = [
-      { name: 'Normal document.docx', content: Buffer.from('This is a test Word document for VDR testing.\n'.repeat(100)), type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
-      { name: 'Test Excel.xlsx', content: Buffer.from('Test,Excel,Data\n1,2,3\n4,5,6\n'.repeat(50)), type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
-      { name: 'Test.jpg', content: Buffer.from('JFIF Test Image Data'.repeat(100)), type: 'image/jpeg' },
-      { name: 'Confidential Business Info.docx', content: Buffer.from('Confidential VDR Test Document.\n'.repeat(100)), type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
-      { name: 'Financial Report.pdf', content: Buffer.from('PDF Financial Report Test Data.\n'.repeat(200)), type: 'application/pdf' },
-      { name: 'Contract.pdf', content: Buffer.from('PDF Contract Test Data.\n'.repeat(150)), type: 'application/pdf' },
-      { name: 'Email.eml', content: Buffer.from('From: test@example.com\nTo: user@example.com\nSubject: Test\n\nTest email content.\n'.repeat(20)), type: 'message/rfc822' },
-      { name: 'Presentation.pptx', content: Buffer.from('PowerPoint Test Presentation Data.\n'.repeat(300)), type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' },
-      { name: 'Spreadsheet Data.xlsx', content: Buffer.from('Data,Analysis,Results\n'.repeat(100)), type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
-      { name: 'Meeting Notes.txt', content: Buffer.from('Meeting notes for VDR test.\n'.repeat(50)), type: 'text/plain' }
-    ];
+    // Path to test files directory
+    const testFilesDir = path.join(__dirname, '../test-files');
+    
+    // Check if directory exists
+    if (!fs.existsSync(testFilesDir)) {
+      console.error('Test files directory not found:', testFilesDir);
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({
+          success: false,
+          message: 'Test files directory not found'
+        })
+      };
+    }
 
-    // Create a zip archive in memory
-    const archive = archiver('zip', {
-      zlib: { level: 9 } // Maximum compression
-    });
-
+    // Create a buffer to store the ZIP
     const chunks = [];
     
-    // Collect zip data
-    archive.on('data', (chunk) => {
-      chunks.push(chunk);
-    });
+    return new Promise((resolve) => {
+      // Create archiver instance
+      const archive = archiver('zip', {
+        zlib: { level: 9 } // Maximum compression
+      });
 
-    // Handle archive completion
-    const zipPromise = new Promise((resolve, reject) => {
+      // Collect data chunks
+      archive.on('data', (chunk) => {
+        chunks.push(chunk);
+      });
+
+      // Handle archive completion
       archive.on('end', () => {
         const zipBuffer = Buffer.concat(chunks);
-        resolve(zipBuffer);
+        const base64Zip = zipBuffer.toString('base64');
+        
+        resolve({
+          statusCode: 200,
+          headers: {
+            ...headers,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            success: true,
+            message: 'ZIP file created successfully',
+            details: 'VDR Test Files ZIP ready for download. Extract the ZIP and use these files for the upload test.',
+            metadata: {
+              zipFile: {
+                name: 'VDR-Test-Files.zip',
+                content: base64Zip,
+                size: zipBuffer.length,
+                type: 'application/zip',
+                encoding: 'base64'
+              }
+            }
+          })
+        });
       });
-      
+
+      // Handle errors
       archive.on('error', (err) => {
-        reject(err);
+        console.error('Archive error:', err);
+        resolve({
+          statusCode: 500,
+          headers,
+          body: JSON.stringify({
+            success: false,
+            message: `Failed to create ZIP: ${err.message}`
+          })
+        });
       });
-    });
 
-    // Add all test files to the zip
-    testFiles.forEach(file => {
-      archive.append(file.content, { name: file.name });
-    });
-
-    // Finalize the archive
-    archive.finalize();
-
-    // Wait for zip to complete
-    const zipBuffer = await zipPromise;
-    const zipBase64 = zipBuffer.toString('base64');
-
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({
-        success: true,
-        message: 'Download test ready',
-        details: `VDR Test Files package ready for download. Contains ${testFiles.length} test files in a single ZIP archive.`,
-        metadata: {
-          filesCount: testFiles.length,
-          zipFile: {
-            name: 'VDR-Test-Files.zip',
-            content: zipBase64,
-            size: zipBuffer.length,
-            type: 'application/zip',
-            encoding: 'base64'
+      // Add all files from test-files directory to the archive
+      try {
+        const files = fs.readdirSync(testFilesDir);
+        
+        files.forEach(file => {
+          const filePath = path.join(testFilesDir, file);
+          const stats = fs.statSync(filePath);
+          
+          if (stats.isFile()) {
+            archive.file(filePath, { name: file });
           }
-        }
-      })
-    };
+        });
+
+        // Finalize the archive
+        archive.finalize();
+      } catch (err) {
+        console.error('Error reading files:', err);
+        resolve({
+          statusCode: 500,
+          headers,
+          body: JSON.stringify({
+            success: false,
+            message: `Error reading test files: ${err.message}`
+          })
+        });
+      }
+    });
   } catch (error) {
     console.error('Download preparation error:', error);
     return {
