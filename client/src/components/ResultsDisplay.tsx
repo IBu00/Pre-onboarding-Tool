@@ -55,11 +55,24 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ results, onRestart }) =
 
           {/* Overall Status */}
           <div className={`${statusColor} text-white rounded-xl p-6 mb-6 text-center`}>
-            <h2 className="text-2xl md:text-3xl font-bold">{overallStatus}</h2>
+            <h2 className="text-2xl md:text-3xl font-bold mb-2">{overallStatus}</h2>
+            {failCount === 0 && warnCount === 0 && (
+              <p className="text-lg mt-2">
+                🎉 Congratulations! Your environment is fully compatible with the ILex platform.
+              </p>
+            )}
           </div>
 
           {/* Action Buttons */}
           <div className="flex flex-col md:flex-row gap-4">
+            {failCount === 0 && warnCount === 0 && (
+              <button
+                onClick={() => window.open('https://www.institutionallendingexchange.com/', '_blank')}
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white text-lg font-semibold py-4 px-8 rounded-lg shadow-lg transition-all duration-200 transform hover:scale-105"
+              >
+                ✅ Proceed to iLex
+              </button>
+            )}
             <button
               onClick={handleDownloadPDF}
               className="flex-1 bg-primary hover:bg-primary-dark text-white text-lg font-semibold py-4 px-8 rounded-lg shadow-lg transition-all duration-200 transform hover:scale-105"
