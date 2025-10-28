@@ -1,0 +1,9 @@
+{
+  "name": "netlify-functions",
+  "version": "1.0.0",
+  "description": "Netlify serverless functions for pre-onboarding tool",
+  "dependencies": {
+    "archiver": "^6.0.1",
+    "busboy": "^1.6.0"
+  }
+}

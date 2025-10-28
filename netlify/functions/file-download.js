@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const archiver = require('archiver');
 
 exports.handler = async (event, context) => {
   const headers = {
@@ -13,51 +14,62 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    // Path to test files directory
-    const testFilesDir = path.join(__dirname, '../test-files');
+    // Path to VDR Test Files directory
+    const testFilesDir = path.join(__dirname, '../../VDR Test Files');
     
-    // Define test files that will be available for download
-    const testFileNames = [
-      'Normal document.docx',
-      'Test Excel.xlsx',
-      'Test.jpg'
-    ];
+    // Check if directory exists
+    if (!fs.existsSync(testFilesDir)) {
+      throw new Error('VDR Test Files directory not found');
+    }
 
-    const testFiles = testFileNames.map(fileName => {
-      const filePath = path.join(testFilesDir, fileName);
-      let fileData = null;
-      let fileSize = 0;
+    // Read all files from the directory
+    const allFiles = fs.readdirSync(testFilesDir);
+    
+    if (allFiles.length === 0) {
+      throw new Error('No test files found in VDR Test Files directory');
+    }
+
+    // Create a zip archive in memory
+    const archive = archiver('zip', {
+      zlib: { level: 9 } // Maximum compression
+    });
+
+    const chunks = [];
+    
+    // Collect zip data
+    archive.on('data', (chunk) => {
+      chunks.push(chunk);
+    });
+
+    // Handle archive completion
+    const zipPromise = new Promise((resolve, reject) => {
+      archive.on('end', () => {
+        const zipBuffer = Buffer.concat(chunks);
+        resolve(zipBuffer);
+      });
       
-      try {
-        // Check if file exists
-        if (fs.existsSync(filePath)) {
-          const stats = fs.statSync(filePath);
-          fileSize = stats.size;
-          // Read file as base64 for binary files
-          fileData = fs.readFileSync(filePath).toString('base64');
-        }
-      } catch (err) {
-        console.error(`Error reading file ${fileName}:`, err);
-      }
+      archive.on('error', (err) => {
+        reject(err);
+      });
+    });
 
-      // Determine MIME type
-      let mimeType = 'application/octet-stream';
-      if (fileName.endsWith('.docx')) {
-        mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-      } else if (fileName.endsWith('.xlsx')) {
-        mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-      } else if (fileName.endsWith('.jpg') || fileName.endsWith('.jpeg')) {
-        mimeType = 'image/jpeg';
+    // Add all files from VDR Test Files directory to the zip
+    allFiles.forEach(fileName => {
+      const filePath = path.join(testFilesDir, fileName);
+      const stats = fs.statSync(filePath);
+      
+      // Only add files, not directories
+      if (stats.isFile()) {
+        archive.file(filePath, { name: fileName });
       }
+    });
 
-      return {
-        name: fileName,
-        content: fileData,
-        size: fileSize,
-        type: mimeType,
-        encoding: 'base64'
-      };
-    }).filter(file => file.content !== null); // Only include files that were successfully read
+    // Finalize the archive
+    archive.finalize();
+
+    // Wait for zip to complete
+    const zipBuffer = await zipPromise;
+    const zipBase64 = zipBuffer.toString('base64');
 
     return {
       statusCode: 200,
@@ -65,12 +77,19 @@ exports.handler = async (event, context) => {
       body: JSON.stringify({
         success: true,
         message: 'Download test ready',
-        details: `Found ${testFiles.length} file(s) available for download. Your browser and network configuration allow file downloads. No download restrictions detected. Click "Download Files" button to download all files at once and test the download functionality.`,
+        details: `VDR Test Files package ready for download. Contains ${allFiles.length} test files in a single ZIP archive. Click "Download Test Files" to download.`,
         metadata: {
-          filesCount: testFiles.length,
-          files: testFiles,
-          totalSize: testFiles.reduce((sum, f) => sum + f.size, 0),
-          instruction: 'Click the Download Files button to download all files. Then use these files for the Upload Test.'
+          filesCount: allFiles.length,
+          zipFile: {
+            name: 'VDR-Test-Files.zip',
+            content: zipBase64,
+            size: zipBuffer.length,
+            type: 'application/zip',
+            encoding: 'base64'
+          },
+          fileList: allFiles,
+          totalSize: zipBuffer.length,
+          instruction: 'Download the ZIP file and extract it. Then use these files for the Upload Test.'
         }
       })
     };
@@ -82,10 +101,11 @@ exports.handler = async (event, context) => {
       body: JSON.stringify({
         success: false,
         message: 'Download test failed',
-        details: 'Failed to prepare files for download testing.',
+        details: `Failed to prepare files for download testing. Error: ${error.message}`,
         blockers: [
           'Server file system access denied',
-          'File preparation error'
+          'File preparation error',
+          error.message
         ],
         metadata: { error: error.message }
       })

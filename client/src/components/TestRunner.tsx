@@ -521,16 +521,16 @@ const TestRunner: React.FC = () => {
               children = (
                 <div className="bg-green-50 border-2 border-green-400 rounded-lg p-4">
                   <p className="text-green-800 mb-3 font-semibold">
-                    Click the button below to download test files:
+                    Click the button below to download VDR test files as a ZIP archive:
                   </p>
                   <button
                     onClick={handleDownloadFiles}
                     className="w-full px-8 py-4 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 transition-colors text-lg shadow-md"
                   >
-                    📥 Download Test Files
+                    📥 Download VDR Test Files (ZIP)
                   </button>
                   <p className="text-sm text-green-700 mt-2">
-                    💡 This will download 3 test files to verify download capabilities
+                    💡 This will download a ZIP file containing all VDR test files. Extract the ZIP and use these files for the upload test.
                   </p>
                 </div>
               );

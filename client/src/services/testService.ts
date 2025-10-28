@@ -54,18 +54,33 @@ class TestService {
     try {
       const response = await apiService.testFileDownload();
       
-      if (response.success && response.metadata?.files) {
-        // Automatically download all files at once
-        await apiService.downloadAllFiles(response.metadata.files);
+      if (response.success && response.metadata?.zipFile) {
+        // Download the single ZIP file
+        const zipFile = response.metadata.zipFile;
+        const blob = apiService.base64ToBlob(zipFile.content, zipFile.type);
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = zipFile.name;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        
+        const fileSizeMB = (zipFile.size / (1024 * 1024)).toFixed(2);
         
         return this.createResult(
           TestType.FILE_DOWNLOAD,
           'File Download Test',
           'PASS',
-          'All files downloaded successfully',
-          `Successfully downloaded ${response.metadata.filesCount} file(s). Your browser and network allow file downloads without restrictions. Use these files for the Upload Test.`,
+          'ZIP file downloaded successfully',
+          `Successfully downloaded ${zipFile.name} (${fileSizeMB} MB) containing ${response.metadata.filesCount} test files. Your browser and network allow file downloads without restrictions. Extract the ZIP file and use these files for the Upload Test.`,
           undefined,
-          response.metadata
+          {
+            ...response.metadata,
+            downloadedFile: zipFile.name,
+            fileSize: zipFile.size
+          }
         );
       }
       
