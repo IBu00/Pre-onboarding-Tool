@@ -329,7 +329,6 @@ const TestRunner: React.FC = () => {
         timestamp: new Date(),
         recommendations: [
           'Check internet connection',
-          'Verify file sizes are within 100MB limit per file',
           'Ensure you selected the correct files',
           'Try uploading fewer files at once'
         ],
@@ -542,7 +541,7 @@ const TestRunner: React.FC = () => {
               children = (
                 <div className="bg-orange-50 border-2 border-orange-400 rounded-lg p-4">
                   <p className="text-orange-800 mb-3 font-semibold">
-                    Select files to test upload (up to 100 files, max 100MB each):
+                    Select files to test upload:
                   </p>
                   <input
                     type="file"
@@ -584,52 +583,6 @@ const TestRunner: React.FC = () => {
             );
           })}
         </div>
-
-        {/* Download Test Button */}
-        {showDownloadButton && (
-          <div className="bg-green-50 border-2 border-green-400 rounded-lg p-6 mb-6">
-            <h3 className="font-bold text-green-900 mb-3">📥 File Download Test</h3>
-            <p className="text-green-800 mb-4">
-              Click the button below to download test files and verify download functionality:
-            </p>
-            <button
-              onClick={handleDownloadFiles}
-              className="w-full px-8 py-4 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 transition-colors text-lg shadow-md"
-            >
-              Download Test Files
-            </button>
-            <p className="text-sm text-green-700 mt-2">
-              💡 This will download 3 test files to verify your environment's download capabilities
-            </p>
-          </div>
-        )}
-
-        {/* Upload Test Button */}
-        {showUploadButton && (
-          <div className="bg-orange-50 border-2 border-orange-400 rounded-lg p-6 mb-6">
-            <h3 className="font-bold text-orange-900 mb-3">� File Upload Test</h3>
-            <p className="text-orange-800 mb-4">
-              Select the files you just downloaded to test upload functionality:
-            </p>
-            <input
-              type="file"
-              multiple
-              accept=".docx,.xlsx,.jpg,.jpeg,.txt,.pdf,.zip"
-              onChange={(e) => e.target.files && handleFileUpload(e.target.files)}
-              className="hidden"
-              id="upload-test-input"
-            />
-            <label
-              htmlFor="upload-test-input"
-              className="block w-full px-8 py-4 bg-orange-500 text-white rounded-lg font-semibold hover:bg-orange-600 transition-colors text-lg shadow-md text-center cursor-pointer"
-            >
-              Upload Test Files
-            </label>
-            <p className="text-sm text-orange-700 mt-2">
-              💡 Select all 3 files that were downloaded in the previous test
-            </p>
-          </div>
-        )}
       </div>
     </div>
   );
