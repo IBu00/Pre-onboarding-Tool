@@ -22,12 +22,28 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    // Path to test files directory
-    const testFilesDir = path.join(__dirname, '../test-files');
+    // Path to test files directory - in Netlify, it's relative to the functions directory
+    // Try multiple possible paths
+    let testFilesDir = path.join(__dirname, '../test-files');
+    
+    // If not found, try from the repo root
+    if (!fs.existsSync(testFilesDir)) {
+      testFilesDir = path.join(__dirname, '../../netlify/test-files');
+    }
+    
+    // If still not found, try absolute path in build
+    if (!fs.existsSync(testFilesDir)) {
+      testFilesDir = '/opt/build/repo/netlify/test-files';
+    }
     
     // Check if directory exists
     if (!fs.existsSync(testFilesDir)) {
-      console.error('Test files directory not found:', testFilesDir);
+      console.error('Test files directory not found. Tried paths:', {
+        path1: path.join(__dirname, '../test-files'),
+        path2: path.join(__dirname, '../../netlify/test-files'),
+        path3: '/opt/build/repo/netlify/test-files',
+        __dirname: __dirname
+      });
       return {
         statusCode: 500,
         headers,
@@ -37,6 +53,8 @@ exports.handler = async (event, context) => {
         })
       };
     }
+    
+    console.log('Using test files directory:', testFilesDir);
 
     // Create a buffer to store the ZIP
     const chunks = [];
