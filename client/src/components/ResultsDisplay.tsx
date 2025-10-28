@@ -75,26 +75,26 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ results, onRestart }) =
 
           {/* Action Buttons */}
           <div className="flex flex-col md:flex-row gap-4">
-            {failCount === 0 && (
-              <button
-                onClick={() => window.open('https://www.institutionallendingexchange.com/', '_blank')}
-                className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded transition-colors"
-              >
-                Proceed to iLex
-              </button>
-            )}
             <button
               onClick={handleDownloadPDF}
               className="flex-1 bg-primary hover:bg-primary-dark text-white font-semibold py-3 px-6 rounded transition-colors"
             >
-              Download PDF Report
+              Download Test Report
             </button>
             <button
               onClick={onRestart}
               className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-semibold py-3 px-6 rounded transition-colors"
             >
-              Run New Test
+              Start New Test
             </button>
+            {failCount === 0 && (
+              <button
+                onClick={() => window.open('https://www.institutionallendingexchange.com/', '_blank')}
+                className="flex-1 bg-accent hover:bg-green-700 text-white font-semibold py-3 px-6 rounded transition-colors animate-glow"
+              >
+                Proceed to iLex
+              </button>
+            )}
           </div>
         </div>
 
