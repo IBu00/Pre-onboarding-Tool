@@ -275,12 +275,18 @@ const formatMetadata = (metadata: any): string => {
     } else if (typeof value === 'number') {
       // Format numbers nicely
       if (key.toLowerCase().includes('size') || key.toLowerCase().includes('byte')) {
-        const sizeMB = value / (1024 * 1024);
-        if (sizeMB >= 1) {
-          lines.push(`${formattedKey}: ${sizeMB.toFixed(2)} MB`);
+        // totalSize is already in MB, don't convert it again
+        if (key === 'totalSize') {
+          lines.push(`${formattedKey}: ${value.toFixed(2)} MB`);
         } else {
-          const sizeKB = value / 1024;
-          lines.push(`${formattedKey}: ${sizeKB.toFixed(2)} KB`);
+          // For other size fields, assume they're in bytes
+          const sizeMB = value / (1024 * 1024);
+          if (sizeMB >= 1) {
+            lines.push(`${formattedKey}: ${sizeMB.toFixed(2)} MB`);
+          } else {
+            const sizeKB = value / 1024;
+            lines.push(`${formattedKey}: ${sizeKB.toFixed(2)} KB`);
+          }
         }
       } else if (key.toLowerCase().includes('speed')) {
         lines.push(`${formattedKey}: ${value.toFixed(2)} Mbps`);

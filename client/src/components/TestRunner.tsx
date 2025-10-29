@@ -575,7 +575,7 @@ const TestRunner: React.FC = () => {
                     htmlFor="upload-test-input"
                     className="block w-full px-6 py-3 bg-orange-600 text-white rounded font-semibold hover:bg-orange-700 transition-colors text-center cursor-pointer"
                   >
-                    Select Files to Upload
+                    Upload Files
                   </label>
                   <p className="text-xs text-gray-600 mt-2">
                     Upload the previously downloaded test files or any other files.
